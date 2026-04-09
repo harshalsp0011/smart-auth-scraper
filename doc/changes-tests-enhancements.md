@@ -21,8 +21,18 @@
 
 ### backend/main.py + frontend/index.html + frontend/app.js — Backend login gate (implemented)
 - **What:** Added a full-screen login page before the dashboard loads, but the credentials are verified by the backend.
-- **How it works:** The frontend sends the access ID/password to `POST /auth/login`; the backend checks `FRONTEND_LOGIN_ID` / `FRONTEND_LOGIN_PASSWORD` and returns a signed token that the frontend stores for later requests.
+- **How it works:** The frontend sends the access ID/password to `POST /auth/login`; the backend checks `FRONTEND_LOGIN_ID` / `FRONTEND_LOGIN_PASSWORD` and returns an opaque session token that the frontend stores for later requests.
 - **Why:** Keeps the dashboard hidden until authenticated without exposing the login credentials in frontend config files.
+
+### backend/main.py — LLM outage fallback mode (implemented)
+- **What:** Changed `/scrape` behavior so LLM errors no longer fail the whole request.
+- **How it works:** On `LLMError`, backend returns deterministic output with `analysis_mode = rules`, `llm_fallback_reason`, and zero token usage.
+- **Why:** Detection reliability is the primary goal; LLM outages/rate limits should not block core scraping results.
+
+### frontend/index.html + frontend/app.js + frontend/style.css — Session UX additions (implemented)
+- **What:** Added Logout button, analysis-mode badge, and Render cold-start toast.
+- **How it works:** Logout clears local session token and restores login gate; badge shows `LLM` vs `Rules Fallback`; toast appears only during slow first-request wake-up behavior.
+- **Why:** Improves user trust and clarity during session state changes and free-tier cold starts.
 
 ### llm.py — Improved prompt + increased snippet limit
 - **What:** Updated `_build_prompt()` to ask for 4-5 sentences covering 5 specific categories: form type, input fields, alternative login methods (QR/passkey/SSO/OAuth), security features (CAPTCHA/CSRF/WebAuthn/remember me), and UX details (forgot password, register link, required field markers).
@@ -84,7 +94,7 @@ All tests in `backend/tests/` are mocked — no real network or API calls requir
 - `test_scrape_response_includes_auth_confidence` — response includes `auth_confidence`
 - `test_scrape_response_includes_screenshot_base64` — response includes `screenshot_base64`
 - `test_scraper_error_returns_structured_json` — ScraperError → 4-field JSON error
-- `test_llm_error_returns_structured_json` — LLMError → 4-field JSON error
+- `test_llm_error_falls_back_to_rules_mode` — LLMError returns 200 with deterministic fallback mode
 - `test_invalid_provider_returns_400` — unknown provider → 400 with LLM_INVALID_PROVIDER
 - `test_unconfigured_provider_returns_400` — key missing → 400 with LLM_NOT_CONFIGURED
 - `test_scrape_includes_provider_used` — response includes provider_used field

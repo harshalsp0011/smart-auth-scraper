@@ -81,6 +81,9 @@ Each agent handles its own errors and communicates failure context upstream.
 | Screenshot capture | Returns a Playwright screenshot of the detected form (or page fallback) alongside HTML |
 | Search URL warning popup | Detects search-result wrapper URLs and explains why the scraper would analyze the wrong page |
 | Frontend login gate | Full-screen access page that unlocks the dashboard after backend-verified login |
+| Logout action | Clears current session token and returns user to login gate |
+| Render cold-start toast | Shows a brief wake-up notice when free-tier backend is inactive |
+| Analysis mode badge | Shows whether result came from LLM or deterministic rules fallback |
 | HTML formatter | Snippet is pretty-printed with indentation + one-click copy button |
 | Token usage | Shows input/output/total tokens per call on the provider card |
 | Structured errors | Every failure has error_type, title, message, and suggestion |
@@ -121,7 +124,7 @@ You only need **at least one** key configured. Unconfigured providers are greyed
 | **Frontend deploy** | Vercel | Serves static files, free, auto-deploy on push |
 | **Tests** | pytest + pytest-asyncio | Unit + integration tests, all mocked |
 
-The frontend includes a login gate, but the credentials are verified by the backend and the frontend only receives a signed access token.
+The frontend includes a login gate, but the credentials are verified by the backend and the frontend only receives an opaque session token.
 
 ---
 
@@ -130,7 +133,7 @@ The frontend includes a login gate, but the credentials are verified by the back
 ```
 smart-auth-scraper/
 ├── backend/
-│   ├── main.py          ← FastAPI: GET /health, GET /providers, POST /scrape
+│   ├── main.py          ← FastAPI: auth routes, providers, and scrape orchestration
 │   ├── scraper.py       ← Fetch HTML (requests → Playwright fallback)
 │   ├── detector.py      ← Find auth form using BeautifulSoup
 │   ├── llm.py           ← Multi-provider AI analysis
@@ -193,11 +196,19 @@ smart-auth-scraper/
   "screenshot_base64": "iVBORw0KGgoAAAANSUhEUgAA...",
   "fields_detected": ["username", "password", "submit"],
   "llm_analysis": "This is a standard login form with username and password fields.",
+  "analysis_mode": "llm",
+  "llm_fallback_reason": null,
   "scrape_method": "requests",
   "provider_used": "openai",
   "tokens_used": { "input": 232, "output": 50, "total": 282 }
 }
 ```
+
+If the selected LLM provider fails, `/scrape` still succeeds with deterministic detection data:
+- `analysis_mode` is `rules`
+- `llm_fallback_reason` contains the LLM error type
+- `llm_analysis` contains a fallback summary
+- `tokens_used` is zeroed
 
 **Error response:**
 ```json

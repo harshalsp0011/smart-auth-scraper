@@ -194,11 +194,23 @@ if is_minimal or is_js_rendered:
 **How it works:**
 - The user enters an access ID and password.
 - The frontend sends the credentials to `POST /auth/login` on the backend.
-- The backend checks them against environment variables and returns a signed access token.
+- The backend checks them against environment variables and returns an opaque session token.
 - The frontend stores only the token and uses it for subsequent API requests.
 - On success, the gate disappears and the dashboard initializes.
+- A Logout button clears the token and returns the user to the login gate.
 
 **Why:** Gives the deployed frontend a lightweight entry gate without changing the backend scraping flow.
+
+---
+
+### 8.5 Render Cold-Start Toast
+**What:** When the backend is sleeping on Render free tier, the frontend shows a short toast while the first request is waiting.
+
+**How it works:**
+- A delayed timer shows a non-blocking notice only when the request is slow enough to indicate backend wake-up.
+- The toast disappears quickly after the first successful response and stays quiet while backend remains warm.
+
+**Why:** Prevents users from thinking login is broken during free-tier cold starts.
 
 ---
 
@@ -220,6 +232,22 @@ if is_minimal or is_js_rendered:
 **What:** A Print button in the results toolbar. `@media print` CSS hides the header, provider cards, URL form, and print button — shows only the results.
 
 **Why:** Assessors or reviewers may want a clean printout of the analysis.
+
+---
+
+### 12. Deterministic Fallback if LLM Fails
+**What:** `/scrape` no longer hard-fails when LLM provider calls fail; it returns rule-based detection output instead.
+
+**How it works:**
+- On `LLMError`, backend switches response mode to rules fallback.
+- Response includes:
+   - `analysis_mode`: `rules`
+   - `llm_fallback_reason`: error type (for example, `LLM_RATE_LIMIT`)
+   - `llm_analysis`: deterministic fallback summary
+   - `tokens_used`: zero
+- Frontend displays an analysis mode badge (`LLM` vs `Rules Fallback`).
+
+**Why:** The core product goal is detection reliability; LLM outages should not block scraping output.
 
 ---
 
@@ -258,7 +286,7 @@ Browser → Vercel (frontend/index.html) → Render (FastAPI backend)
 ```
 1. User opens the app and authenticates through the login gate
 2. app.js → POST /auth/login { login_id, password }
-3. main.py verifies backend env credentials and returns a signed token
+3. main.py verifies backend env credentials and returns an opaque session token
 4. app.js stores the token and uses it for authenticated API requests
 5. app.js → POST /scrape { url, provider }
 6. main.py receives request, validates provider and token
@@ -281,9 +309,10 @@ Browser → Vercel (frontend/index.html) → Render (FastAPI backend)
    d. Parse response → {analysis, tokens_used}
 10. detector.py computes `auth_confidence` (0-100)
 11. scraper.py includes `screenshot_base64` from Playwright capture flow
-12. main.py builds ScrapeResponse JSON with snippet + confidence + screenshot + LLM result
+12. main.py builds ScrapeResponse JSON with snippet + confidence + screenshot + analysis mode
 13. app.js receives JSON → renderResults()
    - Shows status badge, AI analysis, field tags with tooltips
+   - Shows analysis mode badge (LLM or Rules Fallback)
    - Shows confidence meter and label
    - Shows captured screenshot if available (otherwise fallback text)
    - Shows formatted HTML snippet with copy button
