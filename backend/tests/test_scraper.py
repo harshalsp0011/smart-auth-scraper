@@ -24,6 +24,13 @@ SAMPLE_HTML = (
 )
 
 SHORT_HTML = "<html></html>"
+SCRIPT_ONLY_FORM_TEXT_HTML = (
+    "<html><body>"
+    "<script>const template = \"<form><input type='password'></form>\";</script>"
+    "<div id='app'>Loading...</div>"
+    "</body></html>"
+    + "<!-- padding -->" * 40
+)
 
 
 class TestFetchWithRequests:
@@ -82,6 +89,19 @@ class TestFetchHtml:
         with patch("scraper.requests.get", return_value=mock_resp), \
              patch("scraper.fetch_with_playwright", return_value=(SAMPLE_HTML, "mock_b64")):
             html, method, screenshot = fetch_html("https://example.com")
+
+        assert html == SAMPLE_HTML
+        assert method == "playwright"
+        assert screenshot == "mock_b64"
+
+    def test_falls_back_to_playwright_when_form_only_exists_in_script_text(self):
+        mock_resp = MagicMock()
+        mock_resp.text = SCRIPT_ONLY_FORM_TEXT_HTML
+        mock_resp.raise_for_status.return_value = None
+
+        with patch("scraper.requests.get", return_value=mock_resp), \
+             patch("scraper.fetch_with_playwright", return_value=(SAMPLE_HTML, "mock_b64")):
+            html, method, screenshot = fetch_html("https://discord.com/login")
 
         assert html == SAMPLE_HTML
         assert method == "playwright"

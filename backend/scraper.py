@@ -6,6 +6,7 @@ Returns (html, method, screenshot_base64) on success, raises ScraperError on fai
 """
 
 import requests
+from bs4 import BeautifulSoup
 from requests.exceptions import (
     ConnectionError, Timeout, TooManyRedirects, SSLError, HTTPError, RequestException
 )
@@ -160,6 +161,14 @@ def _take_screenshot(url: str) -> str | None:
     return screenshot
 
 
+def _has_real_form_or_input(html: str) -> bool:
+    """Return True only when actual DOM form/input elements exist (not script text)."""
+    if not html:
+        return False
+    soup = BeautifulSoup(html, "html.parser")
+    return bool(soup.find("form") or soup.find("input"))
+
+
 def fetch_html(url: str) -> tuple[str, str, str | None]:
     """
     Fetch HTML from a URL. Returns (html, method_used, screenshot_base64).
@@ -174,9 +183,9 @@ def fetch_html(url: str) -> tuple[str, str, str | None]:
             return playwright_html, "playwright", screenshot
         raise  # re-raise the original ScraperError
 
-    # If HTML looks empty/minimal OR has no form/input elements, try Playwright
+    # If HTML looks empty/minimal OR has no actual DOM form/input elements, try Playwright
     is_minimal = len(html) < 500 or "<body" not in html.lower()
-    is_js_rendered = "<input" not in html.lower() and "<form" not in html.lower()
+    is_js_rendered = not _has_real_form_or_input(html)
     if is_minimal or is_js_rendered:
         playwright_html, screenshot = fetch_with_playwright(url)
         if playwright_html:
