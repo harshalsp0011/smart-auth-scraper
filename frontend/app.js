@@ -58,6 +58,7 @@ const ERROR_META = {
   // Provider config
   INVALID_PROVIDER:        { icon: "❓", theme: "info"  },
   PROVIDER_NOT_CONFIGURED: { icon: "⚙️", theme: "info" },
+  INVALID_URL:             { icon: "🔗", theme: "warning" },
   SEARCH_WRAPPED_URL:      { icon: "🧭", theme: "info" },
   // Network / unknown
   NETWORK_ERROR:        { icon: "🌐", theme: "danger"  },
@@ -383,11 +384,50 @@ function getWrappedTargetUrl(rawUrl) {
   }
 }
 
+function _looksLikeLegitHost(hostname) {
+  if (!hostname) return false;
+  if (hostname === "localhost") return true;
+  if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(hostname)) return true;
+  return hostname.includes(".");
+}
+
+function normalizeUrlForScrape(rawInput) {
+  const trimmed = (rawInput || "").trim();
+  if (!trimmed) return "";
+
+  let candidate = trimmed;
+  if (!/^https?:\/\//i.test(candidate)) {
+    candidate = `https://${candidate}`;
+  }
+
+  try {
+    const parsed = new URL(candidate);
+    const isHttp = parsed.protocol === "http:" || parsed.protocol === "https:";
+    if (!isHttp) return "";
+    if (!_looksLikeLegitHost(parsed.hostname.toLowerCase())) return "";
+    return parsed.toString();
+  } catch {
+    return "";
+  }
+}
+
 // ── Scrape ────────────────────────────────────────────────────────────────────
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
-  const url = urlInput.value.trim();
-  if (!url) return;
+  const rawUrl = urlInput.value.trim();
+  if (!rawUrl) return;
+
+  const url = normalizeUrlForScrape(rawUrl);
+  if (!url) {
+    showErrorPopup({
+      error_type: "INVALID_URL",
+      title: "Invalid URL",
+      message: "Enter a valid website URL. You can paste domains like discord.com/login and we will use https automatically.",
+      suggestion: "Examples: https://discord.com/login or discord.com/login",
+    });
+    return;
+  }
+  urlInput.value = url;
 
   const wrappedTarget = getWrappedTargetUrl(url);
   if (wrappedTarget) {
