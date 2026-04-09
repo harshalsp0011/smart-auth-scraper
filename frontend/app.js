@@ -139,6 +139,27 @@ function hideInfoPopup() {
   infoOverlay.classList.add("hidden");
 }
 
+function showInterstitialNotice({ title, message, suggestion, error_type }) {
+  const notice = document.getElementById("interstitialNotice");
+  const titleEl = document.getElementById("interstitialTitle");
+  const msgEl = document.getElementById("interstitialMessage");
+  const reason = error_type ? ` [${error_type}]` : "";
+  const suggestionText = suggestion ? ` ${suggestion}` : "";
+
+  titleEl.textContent = `${title || "Browser Verification Detected"}${reason}`;
+  msgEl.textContent = `${message || "The page returned an interstitial instead of the login form."}${suggestionText}`;
+  notice.classList.remove("hidden");
+}
+
+function hideInterstitialNotice() {
+  const notice = document.getElementById("interstitialNotice");
+  const titleEl = document.getElementById("interstitialTitle");
+  const msgEl = document.getElementById("interstitialMessage");
+  titleEl.textContent = "";
+  msgEl.textContent = "";
+  notice.classList.add("hidden");
+}
+
 infoBtn.addEventListener("click", showInfoPopup);
 infoCloseBtn.addEventListener("click", hideInfoPopup);
 infoOverlay.addEventListener("click", (e) => {
@@ -478,6 +499,7 @@ form.addEventListener("submit", async (e) => {
 
   setLoading(true);
   results.classList.add("hidden");
+  hideInterstitialNotice();
 
   try {
     const res = await apiFetch("/scrape", {
@@ -496,6 +518,11 @@ form.addEventListener("submit", async (e) => {
     }
 
     if (!res.ok) {
+      if (data.error_type === "SCRAPE_BOT_CHALLENGE" && (data.html_snippet || data.screenshot_base64)) {
+        renderInterstitialResult(url, selectedProvider, data);
+        return;
+      }
+
       // Structured error from backend
       showErrorPopup({
         error_type: data.error_type || "UNKNOWN",
@@ -576,6 +603,8 @@ document.getElementById("copyBtn").addEventListener("click", () => {
 
 // ── Render results ────────────────────────────────────────────────────────────
 function renderResults(data) {
+  hideInterstitialNotice();
+
   const badge = document.getElementById("statusBadge");
   badge.textContent = data.auth_found ? "Auth Form Found" : "No Auth Form Detected";
   badge.className = `badge ${data.auth_found ? "badge-found" : "badge-not-found"}`;
@@ -636,6 +665,34 @@ function renderResults(data) {
   document.querySelector("#htmlSnippet code").textContent = snippet;
 
   results.classList.remove("hidden");
+}
+
+function renderInterstitialResult(url, provider, errorData) {
+  renderResults({
+    url,
+    auth_found: false,
+    auth_confidence: 0,
+    html_snippet: errorData?.html_snippet || null,
+    screenshot_base64: errorData?.screenshot_base64 || null,
+    fields_detected: [],
+    llm_analysis: "Captured an interstitial page instead of a direct login form. Review the screenshot and HTML snippet below.",
+    scrape_method: "playwright",
+    provider_used: provider || selectedProvider || "openai",
+    tokens_used: { input: 0, output: 0, total: 0 },
+    analysis_mode: "rules",
+    llm_fallback_reason: errorData?.error_type || "SCRAPE_BOT_CHALLENGE",
+  });
+
+  const badge = document.getElementById("statusBadge");
+  badge.textContent = "Browser Gate Detected";
+  badge.className = "badge badge-not-found";
+
+  showInterstitialNotice({
+    title: errorData?.title,
+    message: errorData?.message,
+    suggestion: errorData?.suggestion,
+    error_type: errorData?.error_type,
+  });
 }
 
 function confidenceLabel(score) {
