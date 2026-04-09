@@ -67,15 +67,17 @@ URL: {url}
 
 HTML snippet:
 ```html
-{html_snippet[:3000]}
+{html_snippet[:6000]}
 ```
 
-In 2-3 sentences, describe:
-1. What type of authentication form this is (login, signup, password reset, etc.)
-2. What input fields are present (username, email, password, etc.)
-3. Any notable features (remember me checkbox, SSO buttons, CAPTCHA, etc.)
+Describe this authentication form clearly and completely. Cover all of the following that are present:
+1. What type of form this is (login, signup, password reset, MFA, etc.)
+2. What input fields are present (username, email, phone, password, etc.)
+3. Any alternative login methods (QR code, passkey, SSO, OAuth buttons like Google/GitHub, magic link, etc.)
+4. Any security features (CAPTCHA, remember me checkbox, CSRF token, WebAuthn, rate limiting hints, etc.)
+5. Any notable UX details (multi-step flow, required fields marked, forgot password link, register link, etc.)
 
-Be concise and factual."""
+Be factual and specific. If something is present in the HTML, mention it. Keep the response to 4-5 sentences."""
 
 
 def _provider_label(provider: str) -> str:

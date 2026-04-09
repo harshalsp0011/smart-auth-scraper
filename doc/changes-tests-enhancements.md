@@ -4,6 +4,11 @@
 
 ## Changes Made (What & Why)
 
+### llm.py — Improved prompt + increased snippet limit
+- **What:** Updated `_build_prompt()` to ask for 4-5 sentences covering 5 specific categories: form type, input fields, alternative login methods (QR/passkey/SSO/OAuth), security features (CAPTCHA/CSRF/WebAuthn/remember me), and UX details (forgot password, register link, required field markers).
+- **Why:** Old prompt asked for 2-3 sentences and only mentioned "notable features" vaguely — missed QR code login on Discord, passkey buttons, WebAuthn hints, register links. Now every feature in the HTML is explicitly asked for.
+- **Also:** Increased snippet char limit from 3000 → 6000. Discord's form is 40,000 chars — the QR code section was beyond the old 3000 char cutoff and never reached the LLM.
+
 ### detector.py — Broadened password field detection
 - **What:** Was only matching `<input type="password">`. Now also matches inputs where `name`, `aria-label`, `placeholder`, `id`, or `autocomplete` contains "password".
 - **Why:** Demo and real sites sometimes use `type="text"` for the password field (e.g. `web-scraping.dev/login`). The old detector returned `auth_found: false` for these.

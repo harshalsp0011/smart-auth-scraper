@@ -57,12 +57,12 @@ if is_minimal or is_js_rendered:
 ---
 
 ### 3. Multi-Provider LLM Analysis
-**What:** Sends the extracted HTML snippet to an AI model and gets back a 2–3 sentence plain-English description.
+**What:** Sends the extracted HTML snippet to an AI model and gets back a 4–5 sentence plain-English description covering all notable features of the form.
 
 **Why LLM is called:**
 - HTML is machine-readable but not human-friendly
 - A `<form action="/session">` with `<input name="authenticity_token">` means nothing to a non-developer
-- The LLM reads the form like a human would and describes: type of form, what fields are present, notable features
+- The LLM reads the form like a human would and describes: type of form, fields, alternative login methods, security features, and UX details
 
 **How the LLM call works:**
 ```
@@ -70,8 +70,9 @@ if is_minimal or is_js_rendered:
 2. _build_prompt(html_snippet, url) wraps it in a structured prompt:
    - Sets the role: "You are analyzing the HTML of a login/authentication form"
    - Provides the URL for context
-   - Passes the first 3000 chars of the HTML snippet
-   - Asks for: form type, input fields, notable features
+   - Passes the first 6000 chars of the HTML snippet (increased from 3000 to catch full forms like Discord)
+   - Asks for: form type, input fields, alternative login methods (QR/passkey/SSO/OAuth),
+     security features (CAPTCHA/CSRF/WebAuthn), UX details (forgot password/register links)
 3. Prompt sent to selected provider's API
 4. Response parsed → returns {"analysis": str, "tokens_used": {...}}
 ```
