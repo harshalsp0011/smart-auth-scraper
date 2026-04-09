@@ -602,6 +602,8 @@ header p { margin-top: 0.4rem; color: #555; }
 }
 .tag-info   { background: #e0f2fe; color: #0369a1; }
 .tag-tokens { background: #f3e8ff; color: #7c3aed; }
+.tag-mode-llm { background: #dcfce7; color: #166534; }
+.tag-mode-rules { background: #fef3c7; color: #92400e; }
 
 /* ── Field tag tooltips ─────────────────────────── */
 .field-tag {

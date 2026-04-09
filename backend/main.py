@@ -146,6 +146,8 @@ class ScrapeResponse(BaseModel):
     scrape_method: str
     provider_used: str
     tokens_used: TokenUsage
+    analysis_mode: str = "llm"
+    llm_fallback_reason: str | None = None
 
 
 @app.get("/health")
@@ -226,10 +228,29 @@ def scrape(request: ScrapeRequest, user: dict = Depends(_require_auth)):
     detection = detect_auth_component(html)
 
     # LLM analysis
+    analysis_mode = "llm"
+    llm_fallback_reason = None
     try:
         llm_result = analyze_auth_component(detection.get("html_snippet"), url, provider)
     except LLMError as e:
-        return error_response(502, e.error_type, e.title, e.message, e.suggestion)
+        analysis_mode = "rules"
+        llm_fallback_reason = e.error_type
+        if detection["auth_found"]:
+            fallback_text = (
+                f"LLM analysis unavailable ({e.error_type}). "
+                f"Using deterministic detection only: fields={', '.join(detection['fields_detected']) or 'none'}, "
+                f"confidence={detection['auth_confidence']}%."
+            )
+        else:
+            fallback_text = (
+                f"LLM analysis unavailable ({e.error_type}). "
+                "No authentication component detected by rule-based parsing."
+            )
+
+        llm_result = {
+            "analysis": fallback_text,
+            "tokens_used": {"input": 0, "output": 0, "total": 0},
+        }
 
     return ScrapeResponse(
         url=url,
@@ -242,4 +263,6 @@ def scrape(request: ScrapeRequest, user: dict = Depends(_require_auth)):
         scrape_method=method,
         provider_used=provider,
         tokens_used=TokenUsage(**llm_result["tokens_used"]),
+        analysis_mode=analysis_mode,
+        llm_fallback_reason=llm_fallback_reason,
     )

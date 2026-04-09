@@ -147,7 +147,7 @@ class TestScrapeRoute:
         _assert_error_shape(resp.json())
         assert resp.json()["error_type"] == "SCRAPE_TIMEOUT"
 
-    def test_llm_error_returns_structured_json(self):
+    def test_llm_error_falls_back_to_rules_mode(self):
         err = LLMError("LLM_RATE_LIMIT", "Rate Limit", "Too many requests.", "Wait 60s.")
         headers = _auth_headers()
         with patch("main.fetch_html", return_value=(SAMPLE_HTML, "requests", "mock_b64")), \
@@ -155,9 +155,12 @@ class TestScrapeRoute:
              patch("main.is_configured", return_value=True):
             resp = client.post("/scrape", json={"url": "https://example.com/login", "provider": "openai"}, headers=headers)
 
-        assert resp.status_code == 502
-        _assert_error_shape(resp.json())
-        assert resp.json()["error_type"] == "LLM_RATE_LIMIT"
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["analysis_mode"] == "rules"
+        assert data["llm_fallback_reason"] == "LLM_RATE_LIMIT"
+        assert "LLM analysis unavailable" in data["llm_analysis"]
+        assert data["tokens_used"]["total"] == 0
 
     def test_invalid_provider_returns_structured_error(self):
         headers = _auth_headers()

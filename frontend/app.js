@@ -523,6 +523,17 @@ function renderResults(data) {
   document.getElementById("tokenUsage").textContent =
     `${t.total} tokens (in: ${t.input} / out: ${t.output})`;
 
+  const analysisModeEl = document.getElementById("analysisMode");
+  const isRulesFallback = (data.analysis_mode || "llm") === "rules";
+  if (isRulesFallback) {
+    const reason = data.llm_fallback_reason ? ` (${data.llm_fallback_reason})` : "";
+    analysisModeEl.textContent = `Rules Fallback${reason}`;
+    analysisModeEl.className = "tag tag-mode-rules";
+  } else {
+    analysisModeEl.textContent = "LLM";
+    analysisModeEl.className = "tag tag-mode-llm";
+  }
+
   const tokenEl = document.getElementById(`tokens-${data.provider_used}`);
   if (tokenEl) {
     tokenEl.textContent = `Last call: ${t.total} tokens`;
