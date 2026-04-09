@@ -520,6 +520,31 @@ header p { margin-top: 0.4rem; color: #555; }
 .badge-found     { background: #d1fae5; color: #065f46; }
 .badge-not-found { background: #fef3c7; color: #92400e; }
 
+.interstitial-notice {
+  background: #fff8e1;
+  border: 1px solid #fbbf24;
+  border-left: 4px solid #f59e0b;
+  border-radius: 10px;
+  padding: 0.9rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.interstitial-title {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+  color: #92400e;
+  margin-bottom: 0.35rem;
+}
+
+.interstitial-message {
+  margin: 0;
+  color: #78350f;
+  line-height: 1.5;
+  font-size: 0.9rem;
+}
+
 .result-block {
   background: #fff;
   border: 1px solid #e2e8f0;
