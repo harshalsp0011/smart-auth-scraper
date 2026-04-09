@@ -15,11 +15,13 @@ from requests.exceptions import (
 
 class ScraperError(Exception):
     """Structured scraping error with type, title, message, and suggestion."""
-    def __init__(self, error_type: str, title: str, message: str, suggestion: str = ""):
+    def __init__(self, error_type: str, title: str, message: str, suggestion: str = "", html: str | None = None, screenshot_base64: str | None = None):
         self.error_type = error_type
         self.title = title
         self.message = message
         self.suggestion = suggestion
+        self.html = html
+        self.screenshot_base64 = screenshot_base64
         super().__init__(message)
 
 
@@ -234,6 +236,18 @@ def _looks_like_browser_challenge(html: str) -> bool:
     return any(phrase in combined for phrase in challenge_phrases)
 
 
+def _raise_browser_challenge(url: str, html: str, screenshot_base64: str | None = None):
+    """Raise a structured error with the captured challenge page as evidence."""
+    raise ScraperError(
+        error_type="SCRAPE_BOT_CHALLENGE",
+        title="Browser Verification Detected",
+        message="The site returned a browser-check or anti-bot interstitial instead of the login form.",
+        suggestion="This page is blocking automated access. Try a different URL or handle the challenge manually.",
+        html=html,
+        screenshot_base64=screenshot_base64,
+    )
+
+
 def fetch_html(url: str) -> tuple[str, str, str | None]:
     """
     Fetch HTML from a URL. Returns (html, method_used, screenshot_base64).
@@ -246,12 +260,7 @@ def fetch_html(url: str) -> tuple[str, str, str | None]:
         playwright_html, screenshot = fetch_with_playwright(url)
         if playwright_html and len(playwright_html) >= 500:
             if _looks_like_browser_challenge(playwright_html):
-                raise ScraperError(
-                    error_type="SCRAPE_BOT_CHALLENGE",
-                    title="Browser Verification Detected",
-                    message="The site returned a browser-check or anti-bot interstitial instead of the login form.",
-                    suggestion="This page is blocking automated access. Try a different URL or handle the challenge manually.",
-                )
+                _raise_browser_challenge(url, playwright_html, screenshot)
             return playwright_html, "playwright", screenshot
         raise  # re-raise the original ScraperError
 
@@ -263,12 +272,7 @@ def fetch_html(url: str) -> tuple[str, str, str | None]:
         playwright_html, screenshot = fetch_with_playwright(url)
         if playwright_html:
             if _looks_like_browser_challenge(playwright_html):
-                raise ScraperError(
-                    error_type="SCRAPE_BOT_CHALLENGE",
-                    title="Browser Verification Detected",
-                    message="The site returned a browser-check or anti-bot interstitial instead of the login form.",
-                    suggestion="This page is blocking automated access. Try a different URL or handle the challenge manually.",
-                )
+                _raise_browser_challenge(url, playwright_html, screenshot)
             return playwright_html, "playwright", screenshot
 
     if not html:
@@ -280,12 +284,8 @@ def fetch_html(url: str) -> tuple[str, str, str | None]:
         )
 
     if _looks_like_browser_challenge(html):
-        raise ScraperError(
-            error_type="SCRAPE_BOT_CHALLENGE",
-            title="Browser Verification Detected",
-            message="The site returned a browser-check or anti-bot interstitial instead of the login form.",
-            suggestion="This page is blocking automated access. Try a different URL or handle the challenge manually.",
-        )
+        screenshot = _take_screenshot(url)
+        _raise_browser_challenge(url, html, screenshot)
 
     # Static page — take screenshot separately via Playwright
     screenshot = _take_screenshot(url)

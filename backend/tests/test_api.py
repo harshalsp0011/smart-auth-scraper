@@ -147,6 +147,26 @@ class TestScrapeRoute:
         _assert_error_shape(resp.json())
         assert resp.json()["error_type"] == "SCRAPE_TIMEOUT"
 
+    def test_bot_challenge_error_returns_evidence_payload(self):
+        err = ScraperError(
+            "SCRAPE_BOT_CHALLENGE",
+            "Browser Verification Detected",
+            "The site returned a browser-check or anti-bot interstitial instead of the login form.",
+            "This page is blocking automated access. Try a different URL or handle the challenge manually.",
+            html="<html><body>Checking your browser</body></html>",
+            screenshot_base64="mock_screenshot",
+        )
+        headers = _auth_headers()
+        with patch("main.fetch_html", side_effect=err), \
+             patch("main.is_configured", return_value=True):
+            resp = client.post("/scrape", json={"url": "https://example.com/login", "provider": "openai"}, headers=headers)
+
+        assert resp.status_code == 502
+        data = resp.json()
+        assert data["error_type"] == "SCRAPE_BOT_CHALLENGE"
+        assert data["html_snippet"] == "<html><body>Checking your browser</body></html>"
+        assert data["screenshot_base64"] == "mock_screenshot"
+
     def test_llm_error_falls_back_to_rules_mode(self):
         err = LLMError("LLM_RATE_LIMIT", "Rate Limit", "Too many requests.", "Wait 60s.")
         headers = _auth_headers()

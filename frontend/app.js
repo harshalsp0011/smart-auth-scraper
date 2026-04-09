@@ -1,5 +1,5 @@
-//const API_BASE = "http://localhost:8000";
-const API_BASE = "https://smart-auth-scraper.onrender.com";
+const API_BASE = "http://localhost:8000";
+//const API_BASE = "https://smart-auth-scraper.onrender.com";
 const AUTH_TOKEN_STORAGE_KEY = "smart-auth-scraper-auth-token";
 
 let selectedProvider = null;
@@ -43,6 +43,8 @@ const ERROR_META = {
   SCRAPE_HTTP_ERROR:    { icon: "⚠️", theme: "warning" },
   SCRAPE_EMPTY:         { icon: "📄", theme: "warning" },
   SCRAPE_FAILED:        { icon: "❌", theme: "danger"  },
+  SCRAPE_BOT_CHALLENGE: { icon: "🛡️", theme: "warning" },
+  SCRAPE_BROWSER_UNSUPPORTED: { icon: "🧩", theme: "warning" },
   // LLM
   LLM_INVALID_KEY:      { icon: "🔑", theme: "danger"  },
   LLM_RATE_LIMIT:       { icon: "⏳", theme: "warning" },
@@ -65,7 +67,7 @@ const ERROR_META = {
   UNKNOWN:              { icon: "⚠️", theme: "warning" },
 };
 
-function showErrorPopup({ error_type, title, message, suggestion }) {
+function showErrorPopup({ error_type, title, message, suggestion, html_snippet = "", screenshot_base64 = "" }) {
   const meta = ERROR_META[error_type] || ERROR_META.UNKNOWN;
 
   document.getElementById("errorIcon").textContent = meta.icon;
@@ -80,6 +82,31 @@ function showErrorPopup({ error_type, title, message, suggestion }) {
     suggestionBox.classList.remove("hidden");
   } else {
     suggestionBox.classList.add("hidden");
+  }
+
+  const evidenceBox = document.getElementById("errorEvidence");
+  const screenshotEl = document.getElementById("errorScreenshot");
+  const screenshotEmpty = document.getElementById("errorScreenshotEmpty");
+  const htmlEl = document.querySelector("#errorHtmlSnippet code");
+  const hasScreenshot = Boolean(screenshot_base64);
+  const htmlSnippet = html_snippet || "";
+
+  if (hasScreenshot) {
+    screenshotEl.src = `data:image/png;base64,${screenshot_base64}`;
+    screenshotEl.classList.remove("hidden");
+    screenshotEmpty.classList.add("hidden");
+  } else {
+    screenshotEl.removeAttribute("src");
+    screenshotEl.classList.add("hidden");
+    screenshotEmpty.classList.remove("hidden");
+  }
+
+  htmlEl.textContent = htmlSnippet ? formatHTML(htmlSnippet) : "No HTML snippet was returned for this error.";
+
+  if (hasScreenshot || htmlSnippet) {
+    evidenceBox.classList.remove("hidden");
+  } else {
+    evidenceBox.classList.add("hidden");
   }
 
   const overlay = document.getElementById("errorOverlay");
@@ -476,6 +503,8 @@ form.addEventListener("submit", async (e) => {
         title: data.title || "Request Failed",
         message: data.message || `Server returned ${res.status}.`,
         suggestion: data.suggestion || "",
+        html_snippet: data.html_snippet || "",
+        screenshot_base64: data.screenshot_base64 || "",
       });
       return;
     }

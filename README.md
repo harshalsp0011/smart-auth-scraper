@@ -87,7 +87,7 @@ Each agent handles its own errors and communicates failure context upstream.
 | HTML formatter | Snippet is pretty-printed with indentation + one-click copy button |
 | Token usage | Shows input/output/total tokens per call on the provider card |
 | Structured errors | Every failure has error_type, title, message, and suggestion |
-| Error popup | Themed modal (red/yellow/blue) with full context — no vague messages |
+| Error popup | Themed modal (red/yellow/blue) with full context — includes captured HTML/screenshot when the site returns a browser challenge |
 | Print support | Clean print view — hides UI chrome, shows only results |
 | Docker ready | Official Playwright image — runs anywhere with one command |
 
@@ -219,6 +219,8 @@ If the selected LLM provider fails, `/scrape` still succeeds with deterministic 
   "suggestion": "Try the direct login URL."
 }
 ```
+
+When the site returns a browser-verification or anti-bot challenge, the error payload also includes `html_snippet` and `screenshot_base64` so the UI can show the captured evidence directly inside the popup.
 
 ---
 

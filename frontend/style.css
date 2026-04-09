@@ -818,6 +818,48 @@ pre {
   line-height: 1.5;
 }
 
+.error-evidence {
+  display: grid;
+  gap: 0.9rem;
+  text-align: left;
+  margin-bottom: 1rem;
+}
+
+.error-evidence-block {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 0.8rem;
+}
+
+.error-evidence-block h3 {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #64748b;
+  margin-bottom: 0.55rem;
+}
+
+.error-evidence-empty {
+  font-size: 0.84rem;
+  color: #64748b;
+}
+
+.error-evidence-image {
+  width: 100%;
+  max-height: 260px;
+  object-fit: contain;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.error-evidence pre {
+  margin: 0;
+  max-height: 240px;
+  font-size: 0.76rem;
+}
+
 .error-type-badge {
   display: inline-block;
   font-size: 0.68rem;

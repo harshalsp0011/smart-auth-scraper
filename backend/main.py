@@ -42,17 +42,28 @@ AUTH_TOKEN_TTL_SECONDS = int(os.getenv("FRONTEND_AUTH_TOKEN_TTL_SECONDS", "60480
 AUTH_SESSIONS: dict[str, dict] = {}
 
 
-def error_response(status_code: int, error_type: str, title: str, message: str, suggestion: str = ""):
+def error_response(
+    status_code: int,
+    error_type: str,
+    title: str,
+    message: str,
+    suggestion: str = "",
+    html_snippet: str | None = None,
+    screenshot_base64: str | None = None,
+):
     """Return a consistent structured error response."""
-    return JSONResponse(
-        status_code=status_code,
-        content={
-            "error_type": error_type,
-            "title": title,
-            "message": message,
-            "suggestion": suggestion,
-        },
-    )
+    content = {
+        "error_type": error_type,
+        "title": title,
+        "message": message,
+        "suggestion": suggestion,
+    }
+    if html_snippet is not None:
+        content["html_snippet"] = html_snippet
+    if screenshot_base64 is not None:
+        content["screenshot_base64"] = screenshot_base64
+
+    return JSONResponse(status_code=status_code, content=content)
 
 
 @app.exception_handler(HTTPException)
@@ -222,7 +233,15 @@ def scrape(request: ScrapeRequest, user: dict = Depends(_require_auth)):
     try:
         html, method, screenshot_base64 = fetch_html(url)
     except ScraperError as e:
-        return error_response(502, e.error_type, e.title, e.message, e.suggestion)
+        return error_response(
+            502,
+            e.error_type,
+            e.title,
+            e.message,
+            e.suggestion,
+            html_snippet=getattr(e, "html", None),
+            screenshot_base64=getattr(e, "screenshot_base64", None),
+        )
 
     # Detect auth component
     detection = detect_auth_component(html)

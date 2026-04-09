@@ -135,6 +135,17 @@
         <span class="suggestion-label">What to do</span>
         <p id="errorSuggestionText"></p>
       </div>
+      <div id="errorEvidence" class="error-evidence hidden">
+        <div class="error-evidence-block">
+          <h3>Captured screenshot</h3>
+          <div id="errorScreenshotEmpty" class="error-evidence-empty">No screenshot was returned for this error.</div>
+          <img id="errorScreenshot" class="error-evidence-image hidden" alt="Captured page screenshot" />
+        </div>
+        <div class="error-evidence-block">
+          <h3>Captured HTML</h3>
+          <pre id="errorHtmlSnippet"><code></code></pre>
+        </div>
+      </div>
       <div class="error-type-badge" id="errorTypeBadge"></div>
       <button id="errorCloseBtn" class="error-close-btn">Got it</button>
     </div>
