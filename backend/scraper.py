@@ -120,7 +120,13 @@ def fetch_with_playwright(url: str) -> str:
             browser = p.chromium.launch(headless=True)
             page = browser.new_page()
             page.set_extra_http_headers(HEADERS)
-            page.goto(url, timeout=TIMEOUT * 1000, wait_until="networkidle")
+            # Use "load" not "networkidle" — SPAs fire requests forever and never reach networkidle
+            page.goto(url, timeout=TIMEOUT * 1000, wait_until="load")
+            # Wait up to 8s for form/input to appear after JS renders
+            try:
+                page.wait_for_selector("input, form", timeout=8000)
+            except Exception:
+                pass  # no form appeared — return whatever we have
             html = page.content()
             browser.close()
             return html
@@ -142,8 +148,10 @@ def fetch_html(url: str) -> tuple[str, str]:
             return playwright_html, "playwright"
         raise  # re-raise the original ScraperError
 
-    # If HTML looks empty/minimal, try Playwright as upgrade
-    if len(html) < 500 or "<body" not in html.lower():
+    # If HTML looks empty/minimal OR has no form/input elements, try Playwright
+    is_minimal = len(html) < 500 or "<body" not in html.lower()
+    is_js_rendered = "<input" not in html.lower() and "<form" not in html.lower()
+    if is_minimal or is_js_rendered:
         playwright_html = fetch_with_playwright(url)
         if playwright_html:
             return playwright_html, "playwright"
