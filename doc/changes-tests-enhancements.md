@@ -34,6 +34,11 @@
 - **How it works:** Logout clears local session token and restores login gate; badge shows `LLM` vs `Rules Fallback`; toast appears only during slow first-request wake-up behavior.
 - **Why:** Improves user trust and clarity during session state changes and free-tier cold starts.
 
+### scraper.py + frontend/app.js — Browser challenge detection (implemented)
+- **What:** Added structured detection for browser-check / anti-bot interstitials such as WordPress/Cloudflare verification pages.
+- **How it works:** If Playwright or requests returns challenge text like `Checking your browser`, `Secured by wp.com`, or `Cloudflare`, backend raises `SCRAPE_BOT_CHALLENGE` and frontend shows a warning modal.
+- **Why:** Prevents false `No Auth Form Detected` results when the real problem is bot verification, not missing auth.
+
 ### llm.py — Improved prompt + increased snippet limit
 - **What:** Updated `_build_prompt()` to ask for 4-5 sentences covering 5 specific categories: form type, input fields, alternative login methods (QR/passkey/SSO/OAuth), security features (CAPTCHA/CSRF/WebAuthn/remember me), and UX details (forgot password, register link, required field markers).
 - **Why:** Old prompt asked for 2-3 sentences and only mentioned "notable features" vaguely — missed QR code login on Discord, passkey buttons, WebAuthn hints, register links. Now every feature in the HTML is explicitly asked for.
@@ -95,6 +100,7 @@ All tests in `backend/tests/` are mocked — no real network or API calls requir
 - `test_scrape_response_includes_screenshot_base64` — response includes `screenshot_base64`
 - `test_scraper_error_returns_structured_json` — ScraperError → 4-field JSON error
 - `test_llm_error_falls_back_to_rules_mode` — LLMError returns 200 with deterministic fallback mode
+- `test_raises_bot_challenge_error_for_browser_verification_page` — browser verification pages surface as `SCRAPE_BOT_CHALLENGE`
 - `test_invalid_provider_returns_400` — unknown provider → 400 with LLM_INVALID_PROVIDER
 - `test_unconfigured_provider_returns_400` — key missing → 400 with LLM_NOT_CONFIGURED
 - `test_scrape_includes_provider_used` — response includes provider_used field

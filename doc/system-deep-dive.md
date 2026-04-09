@@ -115,6 +115,10 @@ if is_minimal or is_js_rendered:
 
 **Why:** Vague errors ("500 Internal Server Error") tell you nothing. A structured error tells you exactly what failed, why, and what to do.
 
+**Browser challenge handling:**
+- Pages that show messages like `Checking your browser`, `Secured by wp.com`, or `Cloudflare` are treated as bot challenges rather than no-auth pages.
+- The scraper raises `SCRAPE_BOT_CHALLENGE` so the UI can tell the user what happened.
+
 **Shape:**
 ```json
 {
@@ -297,6 +301,7 @@ Browser → Vercel (frontend/index.html) → Render (FastAPI backend)
       - Navigates to URL, wait_until="load"
       - Waits up to 8s for input/form to appear
       - Returns rendered HTML
+   c. If browser-challenge text is detected → raises `SCRAPE_BOT_CHALLENGE`
 8. detector.py:
    a. BeautifulSoup parses HTML
    b. Finds password-related input (by type or name/aria-label/placeholder)

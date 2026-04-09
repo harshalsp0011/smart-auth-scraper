@@ -37,6 +37,13 @@ LOGIN_SHELL_NON_AUTH_FORM_HTML = (
     "</body></html>"
     + "<!-- padding -->" * 40
 )
+BOT_CHALLENGE_HTML = (
+    "<html><head><title>Checking your browser</title></head><body>"
+    "<div>Checking your browser before accessing the site.</div>"
+    "<div>Secured by wp.com</div>"
+    "</body></html>"
+    + "<!-- padding -->" * 40
+)
 
 
 class TestFetchWithRequests:
@@ -125,6 +132,18 @@ class TestFetchHtml:
         assert html == SAMPLE_HTML
         assert method == "playwright"
         assert screenshot == "mock_b64"
+
+    def test_raises_bot_challenge_error_for_browser_verification_page(self):
+        mock_resp = MagicMock()
+        mock_resp.text = SHORT_HTML
+        mock_resp.raise_for_status.return_value = None
+
+        with patch("scraper.requests.get", return_value=mock_resp), \
+             patch("scraper.fetch_with_playwright", return_value=(BOT_CHALLENGE_HTML, "mock_b64")):
+            with pytest.raises(ScraperError) as exc_info:
+                fetch_html("https://wordpress.com/log-in")
+
+        assert exc_info.value.error_type == "SCRAPE_BOT_CHALLENGE"
 
     def test_returns_requests_html_if_playwright_also_fails(self):
         mock_resp = MagicMock()

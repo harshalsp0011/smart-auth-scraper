@@ -204,6 +204,36 @@ def _is_auth_intent_url(url: str) -> bool:
     return False
 
 
+def _looks_like_browser_challenge(html: str) -> bool:
+    """Detect anti-bot / browser verification interstitials before auth detection runs."""
+    if not html:
+        return False
+
+    text = BeautifulSoup(html, "html.parser").get_text(" ", strip=True).lower()
+    title = ""
+    soup = BeautifulSoup(html, "html.parser")
+    if soup.title and soup.title.get_text(strip=True):
+        title = soup.title.get_text(" ", strip=True).lower()
+
+    challenge_phrases = (
+        "checking your browser",
+        "just a moment",
+        "verifying you are human",
+        "verify you are human",
+        "security check",
+        "browser check",
+        "enable javascript and cookies",
+        "please enable cookies",
+        "secured by wp.com",
+        "wp.com",
+        "cloudflare",
+        "attention required",
+    )
+
+    combined = f"{title} {text}"
+    return any(phrase in combined for phrase in challenge_phrases)
+
+
 def fetch_html(url: str) -> tuple[str, str, str | None]:
     """
     Fetch HTML from a URL. Returns (html, method_used, screenshot_base64).
@@ -215,6 +245,13 @@ def fetch_html(url: str) -> tuple[str, str, str | None]:
         # requests failed — try Playwright silently
         playwright_html, screenshot = fetch_with_playwright(url)
         if playwright_html and len(playwright_html) >= 500:
+            if _looks_like_browser_challenge(playwright_html):
+                raise ScraperError(
+                    error_type="SCRAPE_BOT_CHALLENGE",
+                    title="Browser Verification Detected",
+                    message="The site returned a browser-check or anti-bot interstitial instead of the login form.",
+                    suggestion="This page is blocking automated access. Try a different URL or handle the challenge manually.",
+                )
             return playwright_html, "playwright", screenshot
         raise  # re-raise the original ScraperError
 
@@ -225,6 +262,13 @@ def fetch_html(url: str) -> tuple[str, str, str | None]:
     if is_minimal or is_js_rendered or auth_intent_without_password:
         playwright_html, screenshot = fetch_with_playwright(url)
         if playwright_html:
+            if _looks_like_browser_challenge(playwright_html):
+                raise ScraperError(
+                    error_type="SCRAPE_BOT_CHALLENGE",
+                    title="Browser Verification Detected",
+                    message="The site returned a browser-check or anti-bot interstitial instead of the login form.",
+                    suggestion="This page is blocking automated access. Try a different URL or handle the challenge manually.",
+                )
             return playwright_html, "playwright", screenshot
 
     if not html:
@@ -233,6 +277,14 @@ def fetch_html(url: str) -> tuple[str, str, str | None]:
             title="Empty Page",
             message=f"'{url}' returned no content.",
             suggestion="The page may require JavaScript — try a direct login URL.",
+        )
+
+    if _looks_like_browser_challenge(html):
+        raise ScraperError(
+            error_type="SCRAPE_BOT_CHALLENGE",
+            title="Browser Verification Detected",
+            message="The site returned a browser-check or anti-bot interstitial instead of the login form.",
+            suggestion="This page is blocking automated access. Try a different URL or handle the challenge manually.",
         )
 
     # Static page — take screenshot separately via Playwright

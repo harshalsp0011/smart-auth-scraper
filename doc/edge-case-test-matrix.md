@@ -49,6 +49,7 @@ Status legend:
 | Auth-protected redirect loops | Working | Requests maps TooManyRedirects to SCRAPE_REDIRECT_LOOP structured error. | Add direct integration test case to lock behavior. |
 | No-auth informational page | Working | Returns auth_found false, html_snippet null, fields_detected empty, auth_confidence 0. | Add more no-auth pages to regression suite. |
 | Bot protection (403 Forbidden) | Working | HTTP 403 maps to SCRAPE_BLOCKED structured error with actionable suggestion. | Add specific Cloudflare/Akamai scenario examples in tests/docs. |
+| Browser challenge / interstitial page | Working | WordPress/Cloudflare-style pages with text like "Checking your browser" or "Secured by wp.com" now raise `SCRAPE_BOT_CHALLENGE` instead of pretending there is no auth form. | Add more real-world challenge pages to the regression suite. |
 | Malformed URL or empty input | Working | FastAPI request model rejects malformed URL with 422; empty URL blocked in frontend input validation. | Add explicit frontend test coverage if UI automation is introduced. |
 
 ---
@@ -64,7 +65,7 @@ Status legend:
 
 ## Quick Summary
 
-- Working now: no form tag fallback, dynamic class/id resilience, SPA rendering fallback, redirect loop handling, no-auth handling, 403 handling, malformed URL handling.
+- Working now: no form tag fallback, dynamic class/id resilience, SPA rendering fallback, redirect loop handling, no-auth handling, 403 handling, browser challenge handling, malformed URL handling.
 - Partial now: multiple forms ranking, lazy modal interaction, hidden honeypot visibility checks, heavy markup scaling, encoding robustness.
 - Remaining: shadow DOM traversal, iframe login traversal, single-field staged logins, social-login-only detection.
 
