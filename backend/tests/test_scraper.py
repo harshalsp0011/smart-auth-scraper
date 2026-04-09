@@ -66,11 +66,13 @@ class TestFetchHtml:
         mock_resp.text = SAMPLE_HTML
         mock_resp.raise_for_status.return_value = None
 
-        with patch("scraper.requests.get", return_value=mock_resp):
-            html, method = fetch_html("https://example.com")
+        with patch("scraper.requests.get", return_value=mock_resp), \
+             patch("scraper._take_screenshot", return_value="mock_b64"):
+            html, method, screenshot = fetch_html("https://example.com")
 
         assert html == SAMPLE_HTML
         assert method == "requests"
+        assert screenshot == "mock_b64"
 
     def test_falls_back_to_playwright_on_short_html(self):
         mock_resp = MagicMock()
@@ -78,11 +80,12 @@ class TestFetchHtml:
         mock_resp.raise_for_status.return_value = None
 
         with patch("scraper.requests.get", return_value=mock_resp), \
-             patch("scraper.fetch_with_playwright", return_value=SAMPLE_HTML):
-            html, method = fetch_html("https://example.com")
+             patch("scraper.fetch_with_playwright", return_value=(SAMPLE_HTML, "mock_b64")):
+            html, method, screenshot = fetch_html("https://example.com")
 
         assert html == SAMPLE_HTML
         assert method == "playwright"
+        assert screenshot == "mock_b64"
 
     def test_returns_requests_html_if_playwright_also_fails(self):
         mock_resp = MagicMock()
@@ -90,16 +93,18 @@ class TestFetchHtml:
         mock_resp.raise_for_status.return_value = None
 
         with patch("scraper.requests.get", return_value=mock_resp), \
-             patch("scraper.fetch_with_playwright", return_value=""):
-            html, method = fetch_html("https://example.com")
+             patch("scraper.fetch_with_playwright", return_value=("", None)), \
+             patch("scraper._take_screenshot", return_value=None):
+            html, method, screenshot = fetch_html("https://example.com")
 
         assert html == SHORT_HTML
         assert method == "requests"
+        assert screenshot is None
 
     def test_raises_scraper_error_when_requests_fails_and_playwright_empty(self):
         with patch("scraper.fetch_with_requests", side_effect=ScraperError(
             "SCRAPE_BLOCKED", "Blocked", "Site blocked the request.", "Try another URL."
-        )), patch("scraper.fetch_with_playwright", return_value=""):
+        )), patch("scraper.fetch_with_playwright", return_value=("", None)):
             with pytest.raises(ScraperError) as exc_info:
                 fetch_html("https://blocked.example.com")
         assert exc_info.value.error_type == "SCRAPE_BLOCKED"

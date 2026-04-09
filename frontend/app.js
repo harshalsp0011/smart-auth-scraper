@@ -1,14 +1,31 @@
-//const API_BASE = "http://localhost:8000";
-const API_BASE = "https://smart-auth-scraper.onrender.com";
+const API_BASE = "http://localhost:8000";
+//const API_BASE = "https://smart-auth-scraper.onrender.com";
+const AUTH_TOKEN_STORAGE_KEY = "smart-auth-scraper-auth-token";
 
 let selectedProvider = null;
 let providersData = [];
+let appInitialized = false;
 
 const form = document.getElementById("scrapeForm");
 const urlInput = document.getElementById("urlInput");
 const submitBtn = document.getElementById("submitBtn");
+const loginSubmitBtn = document.getElementById("loginSubmitBtn");
 const loader = document.getElementById("loader");
 const results = document.getElementById("results");
+const loginOverlay = document.getElementById("loginOverlay");
+const loginForm = document.getElementById("loginForm");
+const loginIdInput = document.getElementById("loginId");
+const loginPasswordInput = document.getElementById("loginPassword");
+const loginError = document.getElementById("loginError");
+const infoBtn = document.getElementById("infoBtn");
+const logoutBtn = document.getElementById("logoutBtn");
+const infoOverlay = document.getElementById("infoOverlay");
+const infoCloseBtn = document.getElementById("infoCloseBtn");
+const coldStartToast = document.getElementById("coldStartToast");
+
+const COLD_START_TOAST_DELAY_MS = 1200;
+let backendIsWarm = false;
+let pendingWakeRequests = 0;
 
 // ── Error popup ───────────────────────────────────────────────────────────────
 
@@ -41,6 +58,7 @@ const ERROR_META = {
   // Provider config
   INVALID_PROVIDER:        { icon: "❓", theme: "info"  },
   PROVIDER_NOT_CONFIGURED: { icon: "⚙️", theme: "info" },
+  SEARCH_WRAPPED_URL:      { icon: "🧭", theme: "info" },
   // Network / unknown
   NETWORK_ERROR:        { icon: "🌐", theme: "danger"  },
   UNKNOWN:              { icon: "⚠️", theme: "warning" },
@@ -79,13 +97,194 @@ document.getElementById("errorOverlay").addEventListener("click", (e) => {
   if (e.target === document.getElementById("errorOverlay")) hideErrorPopup();
 });
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") hideErrorPopup();
+  if (e.key === "Escape") {
+    hideErrorPopup();
+    hideInfoPopup();
+  }
 });
 
-// ── On load: fetch providers ──────────────────────────────────────────────────
-window.addEventListener("DOMContentLoaded", async () => {
+function showInfoPopup() {
+  infoOverlay.classList.remove("hidden");
+  infoCloseBtn.focus();
+}
+
+function hideInfoPopup() {
+  infoOverlay.classList.add("hidden");
+}
+
+infoBtn.addEventListener("click", showInfoPopup);
+infoCloseBtn.addEventListener("click", hideInfoPopup);
+infoOverlay.addEventListener("click", (e) => {
+  if (e.target === infoOverlay) hideInfoPopup();
+});
+
+function isAuthenticated() {
+  return Boolean(localStorage.getItem(AUTH_TOKEN_STORAGE_KEY));
+}
+
+function setAuthenticated(value) {
+  if (!value) localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+  syncAuthUi();
+}
+
+function getAuthToken() {
+  return localStorage.getItem(AUTH_TOKEN_STORAGE_KEY) || "";
+}
+
+function setAuthToken(token) {
+  if (token) localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, token);
+  else localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+  syncAuthUi();
+}
+
+function syncAuthUi() {
+  const hasSession = isAuthenticated();
+  logoutBtn.classList.toggle("hidden", !hasSession);
+}
+
+function setLoginError(message) {
+  loginError.textContent = message;
+  loginError.classList.remove("hidden");
+}
+
+function clearLoginError() {
+  loginError.textContent = "";
+  loginError.classList.add("hidden");
+}
+
+function showColdStartToast() {
+  coldStartToast.classList.remove("hidden");
+  coldStartToast.classList.add("visible");
+}
+
+function hideColdStartToast() {
+  if (coldStartToast.classList.contains("hidden")) return;
+  coldStartToast.classList.remove("visible");
+  setTimeout(() => {
+    if (!coldStartToast.classList.contains("visible")) {
+      coldStartToast.classList.add("hidden");
+    }
+  }, 220);
+}
+
+function startColdStartNoticeTimer() {
+  if (backendIsWarm) {
+    return () => {};
+  }
+
+  pendingWakeRequests += 1;
+  const timer = setTimeout(() => {
+    if (!backendIsWarm && pendingWakeRequests > 0) {
+      showColdStartToast();
+    }
+  }, COLD_START_TOAST_DELAY_MS);
+
+  return () => {
+    clearTimeout(timer);
+    pendingWakeRequests = Math.max(0, pendingWakeRequests - 1);
+    if (pendingWakeRequests === 0) {
+      hideColdStartToast();
+    }
+  };
+}
+
+function unlockApp() {
+  loginOverlay.classList.add("hidden");
+  clearLoginError();
+  syncAuthUi();
+  if (!appInitialized) {
+    appInitialized = true;
+    initApp();
+  }
+}
+
+function initLoginGate() {
+  syncAuthUi();
+
+  if (isAuthenticated()) {
+    verifyExistingSession();
+    return;
+  }
+
+  loginOverlay.classList.remove("hidden");
+  loginPasswordInput.value = "";
+  loginIdInput.focus();
+
+  loginForm.addEventListener("submit", (e) => {
+    e.preventDefault();
+
+    const enteredId = loginIdInput.value.trim();
+    const enteredPassword = loginPasswordInput.value;
+
+    authenticateWithBackend(enteredId, enteredPassword);
+  });
+}
+
+async function apiFetch(path, options = {}) {
+  const finishNotice = startColdStartNoticeTimer();
+  const headers = {
+    ...(options.headers || {}),
+  };
+  const token = getAuthToken();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
   try {
-    const res = await fetch(`${API_BASE}/providers`);
+    const response = await fetch(`${API_BASE}${path}`, {
+      ...options,
+      headers,
+    });
+    backendIsWarm = true;
+    return response;
+  } finally {
+    finishNotice();
+  }
+}
+
+async function authenticateWithBackend(loginId, password) {
+  clearLoginError();
+  loginSubmitBtn.disabled = true;
+
+  try {
+    const res = await apiFetch("/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ login_id: loginId, password }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      setAuthenticated(false);
+      setLoginError(data.message || data.detail?.message || data.suggestion || "Login failed.");
+      loginPasswordInput.value = "";
+      loginPasswordInput.focus();
+      return;
+    }
+
+    setAuthToken(data.token);
+    unlockApp();
+  } catch {
+    setLoginError("Could not reach the backend login endpoint.");
+  } finally {
+    loginSubmitBtn.disabled = false;
+  }
+}
+
+async function verifyExistingSession() {
+  try {
+    const res = await apiFetch("/auth/me");
+    if (!res.ok) throw new Error("Invalid session");
+    unlockApp();
+  } catch {
+    setAuthToken("");
+    loginOverlay.classList.remove("hidden");
+  }
+}
+
+async function initApp() {
+  try {
+    const res = await apiFetch("/providers");
     if (!res.ok) throw new Error("Server error");
     const data = await res.json();
     providersData = data.providers;
@@ -95,6 +294,23 @@ window.addEventListener("DOMContentLoaded", async () => {
     document.getElementById("providerCards").innerHTML =
       '<p style="color:#b91c1c;grid-column:1/-1">Could not load providers — is the server running on port 8000?</p>';
   }
+}
+
+// ── On load: gate + fetch providers after login ─────────────────────────────
+window.addEventListener("DOMContentLoaded", () => {
+  initLoginGate();
+});
+
+logoutBtn.addEventListener("click", () => {
+  setAuthToken("");
+  hideInfoPopup();
+  hideColdStartToast();
+  setLoading(false);
+  results.classList.add("hidden");
+  clearLoginError();
+  loginPasswordInput.value = "";
+  loginOverlay.classList.remove("hidden");
+  loginIdInput.focus();
 });
 
 // ── Provider cards ────────────────────────────────────────────────────────────
@@ -139,11 +355,50 @@ function providerCardHTML(p) {
     </div>`;
 }
 
+function getWrappedTargetUrl(rawUrl) {
+  try {
+    const parsed = new URL(rawUrl);
+    const host = parsed.hostname.toLowerCase();
+    const isSearchHost = ["google.", "bing.", "duckduckgo.com", "search.yahoo."].some((h) => host.includes(h));
+    if (!isSearchHost) return "";
+
+    // Common search engines store the target URL in query params like q, url, or u.
+    const candidate = parsed.searchParams.get("q")
+      || parsed.searchParams.get("url")
+      || parsed.searchParams.get("u")
+      || "";
+    if (!candidate) return "";
+
+    let decoded = candidate;
+    try {
+      decoded = decodeURIComponent(candidate);
+    } catch {
+      decoded = candidate;
+    }
+
+    if (/^https?:\/\//i.test(decoded)) return decoded;
+    return "";
+  } catch {
+    return "";
+  }
+}
+
 // ── Scrape ────────────────────────────────────────────────────────────────────
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
   const url = urlInput.value.trim();
   if (!url) return;
+
+  const wrappedTarget = getWrappedTargetUrl(url);
+  if (wrappedTarget) {
+    showErrorPopup({
+      error_type: "SEARCH_WRAPPED_URL",
+      title: "Search Results URL Detected",
+      message: "You pasted a search page URL, so the scraper is analyzing search results instead of the login page.",
+      suggestion: `Use the direct target URL instead: ${wrappedTarget}`,
+    });
+    return;
+  }
 
   if (!selectedProvider) {
     showErrorPopup({
@@ -159,13 +414,20 @@ form.addEventListener("submit", async (e) => {
   results.classList.add("hidden");
 
   try {
-    const res = await fetch(`${API_BASE}/scrape`, {
+    const res = await apiFetch("/scrape", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url, provider: selectedProvider }),
     });
 
     const data = await res.json();
+
+    if (res.status === 401) {
+      setAuthToken("");
+      loginOverlay.classList.remove("hidden");
+      setLoginError(data.message || data.detail?.message || "Please sign in again.");
+      return;
+    }
 
     if (!res.ok) {
       // Structured error from backend
@@ -250,6 +512,12 @@ function renderResults(data) {
   badge.textContent = data.auth_found ? "Auth Form Found" : "No Auth Form Detected";
   badge.className = `badge ${data.auth_found ? "badge-found" : "badge-not-found"}`;
 
+  const confidence = Number.isFinite(data.auth_confidence) ? data.auth_confidence : 0;
+  const safeConfidence = Math.max(0, Math.min(100, confidence));
+  document.getElementById("confidenceScore").textContent = `${safeConfidence}%`;
+  document.getElementById("confidenceFill").style.width = `${safeConfidence}%`;
+  document.getElementById("confidenceLabel").textContent = confidenceLabel(safeConfidence);
+
   document.getElementById("providerUsed").textContent = `via ${data.provider_used}`;
   const t = data.tokens_used;
   document.getElementById("tokenUsage").textContent =
@@ -272,10 +540,30 @@ function renderResults(data) {
     : '<span style="color:#718096">None detected</span>';
 
   document.getElementById("scrapeMethod").textContent = data.scrape_method;
+
+  const screenshotEl = document.getElementById("formScreenshot");
+  const screenshotEmpty = document.getElementById("screenshotEmpty");
+  if (data.screenshot_base64) {
+    screenshotEl.src = `data:image/png;base64,${data.screenshot_base64}`;
+    screenshotEl.classList.remove("hidden");
+    screenshotEmpty.classList.add("hidden");
+  } else {
+    screenshotEl.removeAttribute("src");
+    screenshotEl.classList.add("hidden");
+    screenshotEmpty.classList.remove("hidden");
+  }
+
   const snippet = data.html_snippet ? formatHTML(data.html_snippet) : "No HTML snippet available.";
   document.querySelector("#htmlSnippet code").textContent = snippet;
 
   results.classList.remove("hidden");
+}
+
+function confidenceLabel(score) {
+  if (score >= 85) return "Very likely this is a real login/authentication form.";
+  if (score >= 65) return "Likely an authentication form, with strong login signals.";
+  if (score >= 40) return "Possible authentication UI, but confidence is moderate.";
+  return "Low confidence that this is a true login form.";
 }
 
 // ── Loading messages ──────────────────────────────────────────────────────────

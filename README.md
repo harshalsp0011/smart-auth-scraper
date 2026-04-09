@@ -10,7 +10,7 @@ Give it any URL. It:
 1. Fetches the page HTML — using a simple HTTP request, or a real browser if the page is JavaScript-rendered
 2. Finds the login/auth form inside that HTML
 3. Sends just the form to an AI model (your choice of provider)
-4. Returns a plain-English description + detected fields + raw HTML snippet
+4. Returns a plain-English description + detected fields + raw HTML snippet + auth confidence (0-100) + screenshot
 
 Every step has structured error handling — no vague messages.
 
@@ -46,6 +46,29 @@ Each agent handles its own errors and communicates failure context upstream.
 
 ---
 
+## How Confidence and Screenshot Work
+
+### Auth confidence score (0-100)
+- Computed in `detector.py` using deterministic heuristics.
+- High-weight signals include password fields, username/email fields, submit action, and auth-related keywords.
+- The score is clamped to 0-100 and returned as `auth_confidence` in `POST /scrape`.
+
+### Screenshot capture
+- Captured by Playwright in `scraper.py` and returned as `screenshot_base64`.
+- Capture priority:
+  1. Form containing a password input
+  2. First available form
+  3. Viewport fallback screenshot
+- Frontend renders it as an inline `data:image/png;base64,...` preview.
+
+### Search-result URL warning popup
+- The frontend checks for wrapper URLs from common search engines before scraping.
+- If the user pastes a search result URL instead of the direct target page, the app shows a popup explaining the problem.
+- The popup includes the extracted direct target URL when one is present in the query string.
+- This prevents false "No Auth Form Detected" results caused by scraping the search page rather than the actual login page.
+
+---
+
 ## Features
 
 | Feature | Description |
@@ -54,6 +77,10 @@ Each agent handles its own errors and communicates failure context upstream.
 | Auth detection | Finds forms by password field (type, name, aria-label, placeholder) |
 | Multi-provider AI | Switch between OpenAI, Ollama Cloud, Google Gemini from the UI |
 | Field tooltips | Hover over detected fields to see what they mean and how detected |
+| Auth confidence score | Heuristic 0-100 score indicating how likely the detected component is a real login form |
+| Screenshot capture | Returns a Playwright screenshot of the detected form (or page fallback) alongside HTML |
+| Search URL warning popup | Detects search-result wrapper URLs and explains why the scraper would analyze the wrong page |
+| Frontend login gate | Full-screen access page that unlocks the dashboard after backend-verified login |
 | HTML formatter | Snippet is pretty-printed with indentation + one-click copy button |
 | Token usage | Shows input/output/total tokens per call on the provider card |
 | Structured errors | Every failure has error_type, title, message, and suggestion |
@@ -94,6 +121,8 @@ You only need **at least one** key configured. Unconfigured providers are greyed
 | **Frontend deploy** | Vercel | Serves static files, free, auto-deploy on push |
 | **Tests** | pytest + pytest-asyncio | Unit + integration tests, all mocked |
 
+The frontend includes a login gate, but the credentials are verified by the backend and the frontend only receives a signed access token.
+
 ---
 
 ## Project Structure
@@ -119,6 +148,8 @@ smart-auth-scraper/
 ├── docker-compose.yml   ← Local Docker setup
 ├── .env.example         ← Template for API keys
 └── doc/
+  ├── README.md                      ← Doc index and reading order
+  ├── edge-case-test-matrix.md       ← Edge-case coverage: working vs remaining
     ├── project-setup-and-mvp.md      ← Build checklist
     ├── system-deep-dive.md           ← Features, LLM flow, tech, infrastructure
     ├── architecture-and-setup.md     ← Architecture diagram + setup steps
@@ -157,7 +188,9 @@ smart-auth-scraper/
 {
   "url": "https://github.com/login",
   "auth_found": true,
+  "auth_confidence": 94,
   "html_snippet": "<form>...</form>",
+  "screenshot_base64": "iVBORw0KGgoAAAANSUhEUgAA...",
   "fields_detected": ["username", "password", "submit"],
   "llm_analysis": "This is a standard login form with username and password fields.",
   "scrape_method": "requests",
@@ -199,15 +232,20 @@ smart-auth-scraper/
 git clone <repo-url>
 cd smart-auth-scraper
 
-# 2. Add API keys
+# 2. Add API keys and backend login credentials
 cp .env.example .env
-# Edit .env — add at least one key
+# Edit .env — add at least one AI provider key plus FRONTEND_LOGIN_ID and FRONTEND_LOGIN_PASSWORD
 
-# 3. Run
-docker compose up -d
+# 3. Build + run
+docker compose up --build -d
 
 # 4. Open frontend/index.html in your browser
 ```
+
+- `backend/Dockerfile` is used by `docker-compose.yml` for local development.
+- Root `Dockerfile` is used for Render deployment from repo root.
+- Both images use the official Playwright Python base (`mcr.microsoft.com/playwright/python:v1.48.0-jammy`) so Chromium and required system dependencies are already included.
+- The backend login credentials live in environment variables on the backend service: `FRONTEND_LOGIN_ID` and `FRONTEND_LOGIN_PASSWORD`.
 
 ### Option B — Local (virtual environment)
 
@@ -256,9 +294,15 @@ All tests are mocked — no real network or API calls needed.
 ### Frontend → Vercel
 1. Vercel → New Project → connect repo
 2. Set **Root Directory** to `frontend`
-3. Framework Preset: `Other`, leave build/output blank
+3. Framework Preset: `Other`, no build command required
 4. Update `API_BASE` in `frontend/app.js` with your Render URL
 5. Deploy
+
+### Backend → Render login config
+1. Add these env vars to the backend Render service:
+  - `FRONTEND_LOGIN_ID`
+  - `FRONTEND_LOGIN_PASSWORD`
+2. Deploy / restart the backend so the login gate can verify credentials server-side.
 
 ---
 

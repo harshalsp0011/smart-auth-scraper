@@ -4,6 +4,26 @@
 
 ## Changes Made (What & Why)
 
+### detector.py + main.py + frontend — Auth confidence score (implemented)
+- **What:** Added `auth_confidence` (0-100) to the detection output, API response, and frontend result cards.
+- **How it works:** Score is computed from deterministic signals: password field presence, username/email signals, submit signals, and auth-related keywords in nearby form text/attributes.
+- **Why:** Helps distinguish true login forms from lookalike inputs (newsletter/search/simple forms) and gives users a measurable confidence level.
+
+### scraper.py + main.py + frontend — Screenshot capture (implemented)
+- **What:** Added Playwright screenshot capture and returned it as `screenshot_base64` in `POST /scrape`.
+- **How it works:** Capture priority is: password form crop → first form crop → viewport fallback.
+- **Why:** Lets users visually validate what form was analyzed, not just trust raw HTML and text analysis.
+
+### frontend/app.js — Search-result URL warning popup (implemented)
+- **What:** Added a popup that warns when the user pastes a search-engine wrapper URL instead of a direct target page.
+- **How it works:** The frontend checks common search engine query params (`q`, `url`, `u`) and shows a contextual error popup with the extracted target URL when possible.
+- **Why:** Prevents confusing false negatives like scraping Google search results instead of the actual login page.
+
+### backend/main.py + frontend/index.html + frontend/app.js — Backend login gate (implemented)
+- **What:** Added a full-screen login page before the dashboard loads, but the credentials are verified by the backend.
+- **How it works:** The frontend sends the access ID/password to `POST /auth/login`; the backend checks `FRONTEND_LOGIN_ID` / `FRONTEND_LOGIN_PASSWORD` and returns a signed token that the frontend stores for later requests.
+- **Why:** Keeps the dashboard hidden until authenticated without exposing the login credentials in frontend config files.
+
 ### llm.py — Improved prompt + increased snippet limit
 - **What:** Updated `_build_prompt()` to ask for 4-5 sentences covering 5 specific categories: form type, input fields, alternative login methods (QR/passkey/SSO/OAuth), security features (CAPTCHA/CSRF/WebAuthn/remember me), and UX details (forgot password, register link, required field markers).
 - **Why:** Old prompt asked for 2-3 sentences and only mentioned "notable features" vaguely — missed QR code login on Discord, passkey buttons, WebAuthn hints, register links. Now every feature in the HTML is explicitly asked for.
@@ -45,11 +65,14 @@ All tests in `backend/tests/` are mocked — no real network or API calls requir
 - `test_raises_scraper_error_on_404` — Not found → `SCRAPE_NOT_FOUND`
 - `test_uses_playwright_when_html_too_short` — requests returns < 500 chars → Playwright fallback triggered
 - `test_uses_requests_when_html_is_sufficient` — requests returns > 500 chars → Playwright NOT called
+- `test_fetch_html_returns_screenshot_when_available` — screenshot is returned in the third tuple value
 - `test_scraper_error_has_all_fields` — error has error_type, title, message, suggestion
 
 ### test_detector.py
 - `test_detects_standard_login_form` — `<input type="password">` → auth_found true
+- `test_confidence_for_standard_login_is_high` — standard login form yields high `auth_confidence`
 - `test_returns_false_when_no_password_field` — no password input → auth_found false
+- `test_confidence_is_zero_when_no_auth` — non-auth and empty HTML return `auth_confidence = 0`
 - `test_detects_fields_correctly` — field list includes email, password, submit
 - `test_returns_html_snippet` — snippet is non-empty string
 - `test_handles_empty_html` — empty string → auth_found false, no crash
@@ -58,6 +81,8 @@ All tests in `backend/tests/` are mocked — no real network or API calls requir
 - `test_health_endpoint` — GET /health → `{"status": "ok"}`
 - `test_providers_endpoint` — GET /providers → has providers list and default key
 - `test_scrape_returns_result` — POST /scrape with valid URL → success shape
+- `test_scrape_response_includes_auth_confidence` — response includes `auth_confidence`
+- `test_scrape_response_includes_screenshot_base64` — response includes `screenshot_base64`
 - `test_scraper_error_returns_structured_json` — ScraperError → 4-field JSON error
 - `test_llm_error_returns_structured_json` — LLMError → 4-field JSON error
 - `test_invalid_provider_returns_400` — unknown provider → 400 with LLM_INVALID_PROVIDER
@@ -69,10 +94,10 @@ All tests in `backend/tests/` are mocked — no real network or API calls requir
 
 ## What We Have Not Tested (Gaps)
 
-- Playwright fallback path is not tested end-to-end (only mocked)
-- detector.py broadened matching (name/aria-label/placeholder) not yet covered by unit tests
+- Playwright screenshot correctness is tested with mocks, not pixel/assertion-level E2E verification
+- Confidence scoring boundaries are covered for common cases, but not yet calibrated against a large labeled dataset
 - Ollama/Gemini/OpenAI error paths tested via mocks but not live API errors
-- No test for empty page (page loads but has no body content)
+- No browser-level UI test currently validates confidence bar rendering + screenshot visibility states together
 
 ---
 
@@ -80,9 +105,7 @@ All tests in `backend/tests/` are mocked — no real network or API calls requir
 
 ### Functional
 - **Batch URL scraping** — accept a list of URLs in one request, return results for all
-- **Auth form scoring** — confidence score (0–100) on how likely the form is a real login vs. search/newsletter
 - **Field-level detail** — return validation rules, required/optional, max length per field
-- **Screenshot capture** — use Playwright to take a screenshot of the auth form alongside the HTML
 - **Multi-form detection** — some pages have both login and signup forms; detect and return both
 
 ### Reliability

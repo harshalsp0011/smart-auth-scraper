@@ -7,10 +7,39 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <div id="loginOverlay" class="login-overlay" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+    <div class="login-card">
+      <div class="login-badge">Secure Access</div>
+      <h2 id="loginTitle">Sign in to continue</h2>
+      <p class="login-copy">Enter your access ID and password. The backend verifies your credentials before unlocking the dashboard.</p>
+
+      <form id="loginForm" class="login-form">
+        <label class="login-label" for="loginId">Access ID</label>
+        <input id="loginId" type="text" autocomplete="username" placeholder="Access ID" />
+
+        <label class="login-label" for="loginPassword">Password</label>
+        <input id="loginPassword" type="password" autocomplete="current-password" placeholder="Password" />
+
+        <button id="loginSubmitBtn" class="login-submit-btn" type="submit">Unlock Dashboard</button>
+        <p id="loginError" class="login-error hidden"></p>
+      </form>
+    </div>
+  </div>
+
   <div class="container">
     <header>
-      <h1>Smart Auth Scraper</h1>
-      <p>Detects login/authentication forms on any website using AI.</p>
+      <div class="header-top">
+        <div class="header-copy">
+          <h1>Smart Auth Scraper</h1>
+          <p>Detects login/authentication forms on any website using AI.</p>
+        </div>
+        <div class="header-actions">
+          <button id="infoBtn" class="info-btn" type="button" aria-label="Open app information" title="What this app does">
+            <span class="info-btn-icon">i</span>
+          </button>
+          <button id="logoutBtn" class="logout-btn hidden" type="button" aria-label="Log out" title="Log out">Log out</button>
+        </div>
+      </div>
     </header>
 
     <!-- Provider Switcher -->
@@ -64,6 +93,23 @@
       </div>
 
       <div class="result-block">
+        <h2>Auth Confidence</h2>
+        <div class="confidence-wrap">
+          <div class="confidence-meter">
+            <div id="confidenceFill" class="confidence-fill"></div>
+          </div>
+          <span id="confidenceScore" class="confidence-score">0%</span>
+        </div>
+        <p id="confidenceLabel" class="confidence-label"></p>
+      </div>
+
+      <div class="result-block">
+        <h2>Captured Form Screenshot</h2>
+        <div id="screenshotEmpty" class="screenshot-empty">No screenshot available for this result.</div>
+        <img id="formScreenshot" class="form-screenshot hidden" alt="Captured authentication form" />
+      </div>
+
+      <div class="result-block">
         <h2>Scrape Method</h2>
         <span id="scrapeMethod" class="tag tag-info"></span>
       </div>
@@ -91,6 +137,53 @@
       <div class="error-type-badge" id="errorTypeBadge"></div>
       <button id="errorCloseBtn" class="error-close-btn">Got it</button>
     </div>
+  </div>
+
+  <!-- App Info Modal -->
+  <div id="infoOverlay" class="info-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="infoTitle">
+    <div class="info-modal">
+      <div class="info-modal-icon">i</div>
+      <h2 id="infoTitle">What this website does</h2>
+      <p class="info-intro">
+        Smart Auth Scraper analyzes a URL and tells you whether it contains a real authentication form.
+      </p>
+
+      <div class="info-section">
+        <h3>Core behavior</h3>
+        <ul>
+          <li>Fetches the page with requests first, then falls back to Playwright when the page is JavaScript-heavy.</li>
+          <li>Detects login/auth forms, even when there is no traditional <code>&lt;form&gt;</code> tag.</li>
+          <li>Returns extracted HTML, detected fields, auth confidence, and a screenshot preview.</li>
+        </ul>
+      </div>
+
+      <div class="info-section">
+        <h3>Features</h3>
+        <ul>
+          <li>Multi-provider AI support: OpenAI, Ollama Cloud, and Google Gemini.</li>
+          <li>Confidence score so you can quickly judge whether it is really a login page.</li>
+          <li>Formatted HTML snippet with one-click copy.</li>
+          <li>Screenshot capture so you can visually verify the analyzed form.</li>
+          <li>Popup warnings for search-result URLs, provider issues, and backend/network errors.</li>
+        </ul>
+      </div>
+
+      <div class="info-section">
+        <h3>How to use it</h3>
+        <ol>
+          <li>Paste a direct website login URL.</li>
+          <li>Select an AI provider from the cards.</li>
+          <li>Click Scrape to view the analysis, confidence, fields, and screenshot.</li>
+        </ol>
+      </div>
+
+      <button id="infoCloseBtn" class="info-close-btn" type="button">Close</button>
+    </div>
+  </div>
+
+  <div id="coldStartToast" class="cold-toast hidden" role="status" aria-live="polite">
+    <div class="cold-toast-title">Waking backend service...</div>
+    <p>Render free instance was idle. First request may take up to 50 seconds.</p>
   </div>
 
   <script src="app.js"></script>

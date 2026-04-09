@@ -1,9 +1,10 @@
 """
 detector.py — Detect authentication components in raw HTML.
-Uses BeautifulSoup to find login forms containing password fields.
-Returns the HTML snippet and list of detected field types.
+Uses BeautifulSoup to find likely login forms and assigns a confidence score (0-100).
+Returns the HTML snippet, detected field types, and confidence.
 """
 
+import re
 from bs4 import BeautifulSoup
 
 
@@ -15,11 +16,17 @@ def detect_auth_component(html: str) -> dict:
         {
             "auth_found": bool,
             "html_snippet": str | None,
-            "fields_detected": list[str]
+            "fields_detected": list[str],
+            "auth_confidence": int,
         }
     """
     if not html:
-        return {"auth_found": False, "html_snippet": None, "fields_detected": []}
+        return {
+            "auth_found": False,
+            "html_snippet": None,
+            "fields_detected": [],
+            "auth_confidence": 0,
+        }
 
     soup = BeautifulSoup(html, "html.parser")
 
@@ -35,7 +42,12 @@ def detect_auth_component(html: str) -> dict:
         ]
 
     if not password_inputs:
-        return {"auth_found": False, "html_snippet": None, "fields_detected": []}
+        return {
+            "auth_found": False,
+            "html_snippet": None,
+            "fields_detected": [],
+            "auth_confidence": 0,
+        }
 
     # Walk up to the nearest <form> ancestor
     form = None
@@ -51,12 +63,66 @@ def detect_auth_component(html: str) -> dict:
 
     snippet = str(form)
     fields = _extract_field_types(form)
+    confidence = _compute_auth_confidence(form, fields)
 
     return {
         "auth_found": True,
         "html_snippet": snippet,
         "fields_detected": fields,
+        "auth_confidence": confidence,
     }
+
+
+def _compute_auth_confidence(element, fields: list[str]) -> int:
+    """Compute a 0-100 confidence score that the element is a login/auth form."""
+    score = 0
+    text = _element_text_for_scoring(element)
+
+    # Strong signal: password field exists in detected fields.
+    if "password" in fields:
+        score += 45
+
+    # Typical login identifier signals.
+    if "username" in fields or "email" in fields:
+        score += 20
+    elif "text" in fields:
+        score += 10
+
+    # Action signal.
+    if "submit" in fields:
+        score += 10
+
+    # Semantic keywords around the form.
+    if re.search(r"\b(login|log in|sign in|signin|authenticate|auth|account)\b", text):
+        score += 12
+
+    if re.search(r"\b(password|passcode|email|username|user id)\b", text):
+        score += 8
+
+    if re.search(r"\b(remember me|forgot password|keep me signed in|2fa|mfa|otp)\b", text):
+        score += 5
+
+    return max(0, min(100, score))
+
+
+def _element_text_for_scoring(element) -> str:
+    """Extract compact lowercase text from relevant attributes and visible labels."""
+    chunks = []
+
+    action = element.get("action", "")
+    if action:
+        chunks.append(action)
+
+    for node in element.find_all(["input", "button", "label", "a"]):
+        for attr in ("name", "id", "placeholder", "aria-label", "autocomplete", "type", "value"):
+            value = node.get(attr)
+            if value:
+                chunks.append(str(value))
+        visible = node.get_text(" ", strip=True)
+        if visible:
+            chunks.append(visible)
+
+    return " ".join(chunks).lower()
 
 
 def _extract_field_types(element) -> list[str]:

@@ -54,28 +54,33 @@ class TestDetectAuthComponent:
     def test_detects_standard_login_form(self):
         result = detect_auth_component(LOGIN_FORM_HTML)
         assert result["auth_found"] is True
+        assert 70 <= result["auth_confidence"] <= 100
         assert result["html_snippet"] is not None
         assert "password" in result["fields_detected"]
 
     def test_detects_email_login_form(self):
         result = detect_auth_component(EMAIL_LOGIN_HTML)
         assert result["auth_found"] is True
+        assert 70 <= result["auth_confidence"] <= 100
         assert "password" in result["fields_detected"]
         assert "email" in result["fields_detected"]
 
     def test_returns_false_when_no_auth(self):
         result = detect_auth_component(NO_AUTH_HTML)
         assert result["auth_found"] is False
+        assert result["auth_confidence"] == 0
         assert result["html_snippet"] is None
         assert result["fields_detected"] == []
 
     def test_handles_empty_html(self):
         result = detect_auth_component(EMPTY_HTML)
         assert result["auth_found"] is False
+        assert result["auth_confidence"] == 0
 
     def test_detects_password_outside_form(self):
         result = detect_auth_component(PASSWORD_NO_FORM_HTML)
         assert result["auth_found"] is True
+        assert 50 <= result["auth_confidence"] <= 100
         assert "password" in result["fields_detected"]
 
     def test_snippet_contains_password_input(self):

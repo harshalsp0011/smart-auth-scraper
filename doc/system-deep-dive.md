@@ -8,7 +8,7 @@ You give it a URL. It:
 1. Fetches the page HTML (like a browser would)
 2. Finds the login/signup form inside that HTML
 3. Sends just that form to an AI model
-4. Returns a plain-English description of what the form does, what fields it has, and any notable features
+4. Returns a plain-English description, detected fields, auth confidence score (0-100), and a screenshot of the analyzed form/page
 
 Every step has error handling. Every failure tells you exactly what went wrong and what to do.
 
@@ -54,6 +54,23 @@ if is_minimal or is_js_rendered:
 | `submit` | type=submit or button |
 | `text` | type=text, not classifiable by name |
 
+**Confidence scoring (0-100):**
+- After form extraction, the detector computes `auth_confidence` from deterministic heuristics.
+- Signals include password presence, username/email signals, submit action, and auth/security keywords.
+- The score is clamped to 0-100 and returned in API output.
+
+---
+
+### 2.5 Screenshot Capture (Playwright)
+**What:** Captures a PNG screenshot and returns it as base64 in `screenshot_base64`.
+
+**Capture priority:**
+1. Form containing a password input
+2. First form on the page
+3. Viewport screenshot fallback
+
+**Why:** Gives visual confirmation of what was analyzed so users can validate extraction quality quickly.
+
 ---
 
 ### 3. Multi-Provider LLM Analysis
@@ -77,7 +94,7 @@ if is_minimal or is_js_rendered:
 4. Response parsed → returns {"analysis": str, "tokens_used": {...}}
 ```
 
-**Why 3000 char limit on snippet?** LLM input tokens cost money. Most forms are well under 3000 chars. Cutting off prevents runaway costs on huge forms.
+**Why 6000 char limit on snippet?** LLM input tokens cost money, but some modern auth forms are large. 6000 chars improves coverage while still preventing runaway prompt size.
 
 **Providers:**
 | Provider | Model | Why we use it |
@@ -164,23 +181,42 @@ if is_minimal or is_js_rendered:
 - Yellow (warning) — soft errors: timeout, rate limit, redirect loop
 - Blue (info) — config issues: provider not configured, unknown provider
 
+**URL warning behavior:**
+- The frontend also uses the popup to warn when the input URL is a search-results wrapper link instead of the actual login page.
+- It extracts the direct target URL from common query params such as `q`, `url`, or `u` when present.
+- This is a user-facing guardrail, not an auto-fix, so the user stays in control of the exact page being scraped.
+
 ---
 
-### 8. Field Tooltips
+### 8. Frontend Login Gate
+**What:** A full-screen login page appears before the dashboard loads.
+
+**How it works:**
+- The user enters an access ID and password.
+- The frontend sends the credentials to `POST /auth/login` on the backend.
+- The backend checks them against environment variables and returns a signed access token.
+- The frontend stores only the token and uses it for subsequent API requests.
+- On success, the gate disappears and the dashboard initializes.
+
+**Why:** Gives the deployed frontend a lightweight entry gate without changing the backend scraping flow.
+
+---
+
+### 9. Field Tooltips
 **What:** Each detected field tag has a `?` icon. Hovering shows a tooltip explaining what the field is and how it was detected.
 
 **Why:** Non-developers looking at "email / password / text" don't know what "text" means or why it's classified differently.
 
 ---
 
-### 9. HTML Snippet — Formatted + Copy Button
+### 10. HTML Snippet — Formatted + Copy Button
 **What:** The extracted form HTML is pretty-printed with proper indentation. A "Copy" button copies it to clipboard (turns green, says "Copied!").
 
 **Why:** Raw HTML is one long unreadable string. Formatted HTML is readable and copy-pasteable for inspection.
 
 ---
 
-### 10. Print Support
+### 11. Print Support
 **What:** A Print button in the results toolbar. `@media print` CSS hides the header, provider cards, URL form, and print button — shows only the results.
 
 **Why:** Assessors or reviewers may want a clean printout of the analysis.
@@ -203,6 +239,7 @@ Browser → frontend/index.html (file://) → app.js → http://localhost:8000
 - Base image: `mcr.microsoft.com/playwright/python:v1.48.0-jammy`
   - Why this image: It comes with Python, Chromium, and all Playwright system dependencies pre-installed. Using a plain Python image and installing Playwright manually breaks on newer Debian (package names changed).
 - `backend/Dockerfile` — for local Docker
+- `docker-compose.yml` builds from `./backend` using `backend/Dockerfile`
 - `Dockerfile` (repo root) — for Render deployment (Render builds from repo root, not from `backend/`)
 - `docker-compose.yml` — loads `.env`, maps port 8000
 
@@ -219,29 +256,36 @@ Browser → Vercel (frontend/index.html) → Render (FastAPI backend)
 ## Full Data Flow (One Scrape Request)
 
 ```
-1. User enters URL + selects provider in UI
-2. app.js → POST /scrape { url, provider }
-3. main.py receives request, validates provider
-4. scraper.py:
+1. User opens the app and authenticates through the login gate
+2. app.js → POST /auth/login { login_id, password }
+3. main.py verifies backend env credentials and returns a signed token
+4. app.js stores the token and uses it for authenticated API requests
+5. app.js → POST /scrape { url, provider }
+6. main.py receives request, validates provider and token
+7. scraper.py:
    a. fetch_with_requests(url) → gets raw HTML
    b. If no <form>/<input> in HTML → fetch_with_playwright(url)
       - Launches headless Chromium
       - Navigates to URL, wait_until="load"
       - Waits up to 8s for input/form to appear
       - Returns rendered HTML
-5. detector.py:
+8. detector.py:
    a. BeautifulSoup parses HTML
    b. Finds password-related input (by type or name/aria-label/placeholder)
    c. Walks up DOM to parent <form>
    d. Extracts HTML snippet + field types
-6. llm.py:
+9. llm.py:
    a. If no snippet → return "No auth component found" (no LLM call)
    b. _build_prompt(snippet, url) → structured prompt string
    c. Call selected provider's API (OpenAI / Ollama / Gemini)
    d. Parse response → {analysis, tokens_used}
-7. main.py builds ScrapeResponse JSON
-8. app.js receives JSON → renderResults()
+10. detector.py computes `auth_confidence` (0-100)
+11. scraper.py includes `screenshot_base64` from Playwright capture flow
+12. main.py builds ScrapeResponse JSON with snippet + confidence + screenshot + LLM result
+13. app.js receives JSON → renderResults()
    - Shows status badge, AI analysis, field tags with tooltips
+   - Shows confidence meter and label
+   - Shows captured screenshot if available (otherwise fallback text)
    - Shows formatted HTML snippet with copy button
    - Updates token count on provider card
 ```
