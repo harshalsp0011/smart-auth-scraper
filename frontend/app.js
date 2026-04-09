@@ -1,5 +1,5 @@
-const API_BASE = "http://localhost:8000";
-//const API_BASE = "https://smart-auth-scraper.onrender.com";
+//const API_BASE = "http://localhost:8000";
+const API_BASE = "https://smart-auth-scraper.onrender.com";
 const AUTH_TOKEN_STORAGE_KEY = "smart-auth-scraper-auth-token";
 
 let selectedProvider = null;
@@ -44,7 +44,6 @@ const ERROR_META = {
   SCRAPE_EMPTY:         { icon: "📄", theme: "warning" },
   SCRAPE_FAILED:        { icon: "❌", theme: "danger"  },
   SCRAPE_BOT_CHALLENGE: { icon: "🛡️", theme: "warning" },
-  SCRAPE_BROWSER_UNSUPPORTED: { icon: "🧩", theme: "warning" },
   // LLM
   LLM_INVALID_KEY:      { icon: "🔑", theme: "danger"  },
   LLM_RATE_LIMIT:       { icon: "⏳", theme: "warning" },
