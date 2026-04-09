@@ -1,5 +1,5 @@
-// const API_BASE = "http://localhost:8000";
-const API_BASE = "https://smart-auth-scraper.onrender.com";
+const API_BASE = "http://localhost:8000";
+//const API_BASE = "https://smart-auth-scraper.onrender.com";
 
 let selectedProvider = null;
 let providersData = [];
@@ -278,8 +278,48 @@ function renderResults(data) {
   results.classList.remove("hidden");
 }
 
+// ── Loading messages ──────────────────────────────────────────────────────────
+const LOADING_STEPS = [
+  { at: 0,     msg: "Reaching out to the site…",              sub: "Sending a request — this usually takes a second." },
+  { at: 2000,  msg: "Reading the page…",                      sub: "Parsing the HTML to find authentication elements." },
+  { at: 4000,  msg: "Hmm, this site is a bit different.",     sub: "Launching a real browser in the background — some pages need JavaScript to load." },
+  { at: 7000,  msg: "Still working on it…",                   sub: "The site may be slow or JS-heavy. Chromium is rendering it now." },
+  { at: 12000, msg: "Almost there, hang tight.",              sub: "Waiting for the login form to appear on the page." },
+  { at: 18000, msg: "This one is taking longer than usual.",  sub: "Complex sites can take up to 30 seconds. Please wait." },
+  { at: 25000, msg: "Still here, still working.",             sub: "Some sites have heavy JavaScript — the browser is still loading." },
+  { at: 35000, msg: "Nearly done…",                           sub: "Wrapping up the analysis. Thank you for your patience." },
+];
+
+let _loaderTimers = [];
+
+function startLoadingMessages() {
+  const msgEl = document.getElementById("loaderMessage");
+  const subEl = document.getElementById("loaderSub");
+  _loaderTimers.forEach(clearTimeout);
+  _loaderTimers = [];
+  LOADING_STEPS.forEach(({ at, msg, sub }) => {
+    _loaderTimers.push(setTimeout(() => {
+      msgEl.style.opacity = "0";
+      subEl.style.opacity = "0";
+      setTimeout(() => {
+        msgEl.textContent = msg;
+        subEl.textContent = sub;
+        msgEl.style.opacity = "1";
+        subEl.style.opacity = "1";
+      }, 200);
+    }, at));
+  });
+}
+
+function stopLoadingMessages() {
+  _loaderTimers.forEach(clearTimeout);
+  _loaderTimers = [];
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function setLoading(on) {
   submitBtn.disabled = on;
   loader.classList.toggle("hidden", !on);
+  if (on) startLoadingMessages();
+  else stopLoadingMessages();
 }

@@ -57,8 +57,8 @@
 
 ## To Do Next
 
-- [ ] Run tests (`pytest tests/`) — verify nothing broke after detector + scraper changes
-- [ ] Scrape 5 demo sites and document results (required by PDF)
+- [x] Run tests (`pytest tests/`) — 28/28 passed (fixed stale anthropic → ollama assertion)
+- [x] Scrape 5 demo sites — all auth_found: true, results in doc/demo-site-results.md
 - [ ] Deploy backend to Render
 - [ ] Deploy frontend to Vercel
 - [ ] Update API_BASE in app.js with Render URL

@@ -52,7 +52,7 @@ class TestProvidersRoute:
         assert resp.status_code == 200
         ids = [p["id"] for p in resp.json()["providers"]]
         assert "openai" in ids
-        assert "anthropic" in ids
+        assert "ollama" in ids
         assert "gemini" in ids
 
     def test_each_provider_has_required_fields(self):
