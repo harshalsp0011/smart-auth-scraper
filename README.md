@@ -4,58 +4,72 @@ An **agentic AI-powered web scraper** that detects and analyzes login/authentica
 
 ---
 
-## What Is "Agentic" About This System?
+## What It Does
 
-This is not just a scraper — it is an **agentic pipeline** where multiple components reason and act in sequence, each making decisions based on the output of the previous step:
+Give it any URL. It:
+1. Fetches the page HTML — using a simple HTTP request, or a real browser if the page is JavaScript-rendered
+2. Finds the login/auth form inside that HTML
+3. Sends just the form to an AI model (your choice of provider)
+4. Returns a plain-English description + detected fields + raw HTML snippet
+
+Every step has structured error handling — no vague messages.
+
+---
+
+## Why It's "Agentic"
+
+Three components run in sequence, each making decisions based on the output of the previous:
 
 ```
 User Input (URL)
     ↓
-Agent 1 — Scraper
-  Decides: Can I fetch this with requests, or do I need Playwright?
-  Acts:    Tries requests first. If page looks JS-rendered → switches to Playwright automatically.
+Agent 1 — Scraper (scraper.py)
+  Decides: Can I fetch this with requests, or do I need a real browser?
+  Acts:    Tries requests. If page has no form/input in static HTML → switches to Playwright.
 
     ↓
-Agent 2 — Detector
+Agent 2 — Detector (detector.py)
   Decides: Is there an authentication form in this HTML?
   Acts:    Searches for password fields → walks up DOM to find the parent form → extracts it.
 
     ↓
-Agent 3 — LLM (OpenAI / Anthropic / Gemini)
+Agent 3 — LLM (llm.py)
   Decides: What does this auth form mean in human language?
-  Acts:    Reads the HTML snippet, identifies form type, fields, and notable features.
+  Acts:    Reads the HTML snippet, identifies form type, fields, notable features.
   Returns: Plain-English description + token usage.
 
     ↓
-Structured Result → UI
+Structured JSON → UI
 ```
 
-Each agent handles its own errors and communicates failure context upstream — the system tells you **exactly what went wrong and why**, not just "error 500".
+Each agent handles its own errors and communicates failure context upstream.
 
 ---
 
-## What It Can Do
+## Features
 
-- Scrape **any website URL** — static or JavaScript-rendered
-- Detect **login, signup, password reset, and SSO** authentication forms
-- Extract the **exact HTML snippet** containing the form
-- Identify **field types** — username, email, password, submit, remember-me
-- Analyze the form using **AI** and return a plain-English description
-- Switch between **3 AI providers** (OpenAI, Anthropic, Google Gemini) from the UI
-- Show **token usage** per API call — input, output, total
-- Show **rate limits** for each provider so you know what you're working with
-- Handle and display **every possible error** with context and a fix suggestion — scraping failures, invalid API keys, rate limits, quota exceeded, DNS errors, blocked sites, and more
-- Fall back to **Playwright** automatically when a site requires JavaScript rendering
+| Feature | Description |
+|---|---|
+| Smart scraping | requests → Playwright fallback for JS-rendered pages |
+| Auth detection | Finds forms by password field (type, name, aria-label, placeholder) |
+| Multi-provider AI | Switch between OpenAI, Ollama Cloud, Google Gemini from the UI |
+| Field tooltips | Hover over detected fields to see what they mean and how detected |
+| HTML formatter | Snippet is pretty-printed with indentation + one-click copy button |
+| Token usage | Shows input/output/total tokens per call on the provider card |
+| Structured errors | Every failure has error_type, title, message, and suggestion |
+| Error popup | Themed modal (red/yellow/blue) with full context — no vague messages |
+| Print support | Clean print view — hides UI chrome, shows only results |
+| Docker ready | Official Playwright image — runs anywhere with one command |
 
 ---
 
 ## AI Providers
 
-| Provider | Model | Tier | Rate Limit | Why We Use It |
-|---|---|---|---|---|
-| **OpenAI** | gpt-4o-mini | Paid | 500 RPM | Fastest, highest quality, most reliable |
-| **Anthropic** | claude-haiku-4-5 | Paid | 50 RPM | Strong reasoning, trial credits on signup then paid |
-| **Google Gemini** | gemini-1.5-flash | Free | 15 RPM / 1M tokens/day | Best free tier limits |
+| Provider | Model | Tier | Rate Limit |
+|---|---|---|---|
+| **OpenAI** | gpt-4.1-mini | Paid | 500 RPM |
+| **Ollama Cloud** | gemma3:4b | Paid | 60 RPM |
+| **Google Gemini** | gemini-2.5-flash | Free | 5 RPM / 250K TPM / 20 RPD |
 
 You only need **at least one** key configured. Unconfigured providers are greyed out in the UI.
 
@@ -65,14 +79,20 @@ You only need **at least one** key configured. Unconfigured providers are greyed
 
 | Layer | Tool | Why |
 |---|---|---|
-| **Backend** | FastAPI (Python) | Lightweight, fast, auto-validates requests, easy to deploy |
-| **Scraping** | requests | Simple and fast for static HTML pages |
-| **JS Fallback** | Playwright + Chromium | Handles React/Angular login pages that need JavaScript |
-| **HTML Parsing** | BeautifulSoup4 | Best Python library for DOM traversal and element extraction |
-| **AI Analysis** | OpenAI / Anthropic / Gemini | LLM interprets the form and gives a human-readable description |
-| **Frontend** | Vanilla HTML/JS/CSS | No framework needed — keeps it lightweight and fast |
-| **Container** | Docker + docker-compose | Reproducible environment, easy to run anywhere |
-| **Tests** | pytest | Unit + integration tests, all mocked — no API calls needed |
+| **Backend** | FastAPI + Uvicorn | Fast, auto-validates requests, async-ready |
+| **Scraping** | requests | Simple HTTP — fast for static pages |
+| **JS fallback** | Playwright + Chromium | Handles React/Angular login pages |
+| **HTML parsing** | BeautifulSoup4 + lxml | Best Python DOM traversal, fast parser |
+| **AI — OpenAI** | openai SDK | Paid, highest quality, most reliable |
+| **AI — Ollama** | ollama SDK | Cloud API, alternative paid provider |
+| **AI — Gemini** | google-generativeai | Free tier with decent limits |
+| **Env vars** | python-dotenv | Loads .env automatically on startup |
+| **Validation** | pydantic | Request/response model validation |
+| **Frontend** | Vanilla HTML/JS/CSS | No framework — lightweight, fast |
+| **Container** | Docker (Playwright base image) | Pre-installed Chromium + system deps |
+| **Backend deploy** | Render | Supports Docker, free tier, GitHub auto-deploy |
+| **Frontend deploy** | Vercel | Serves static files, free, auto-deploy on push |
+| **Tests** | pytest + pytest-asyncio | Unit + integration tests, all mocked |
 
 ---
 
@@ -82,22 +102,27 @@ You only need **at least one** key configured. Unconfigured providers are greyed
 smart-auth-scraper/
 ├── backend/
 │   ├── main.py          ← FastAPI: GET /health, GET /providers, POST /scrape
-│   ├── scraper.py       ← Fetch HTML (requests → Playwright fallback + error classification)
+│   ├── scraper.py       ← Fetch HTML (requests → Playwright fallback)
 │   ├── detector.py      ← Find auth form using BeautifulSoup
-│   ├── llm.py           ← Multi-provider AI analysis (OpenAI, Anthropic, Gemini)
-│   ├── Dockerfile
+│   ├── llm.py           ← Multi-provider AI analysis
+│   ├── Dockerfile       ← For local Docker
 │   ├── requirements.txt
 │   └── tests/
-│       ├── test_scraper.py   ← Unit tests for fetch logic
-│       ├── test_detector.py  ← Unit tests for auth detection
-│       └── test_api.py       ← Integration tests for all API routes
+│       ├── test_scraper.py
+│       ├── test_detector.py
+│       └── test_api.py
 ├── frontend/
 │   ├── index.html       ← UI layout + error popup modal
-│   ├── app.js           ← Provider switcher, API calls, error handling
-│   └── style.css        ← Styles + popup themes (danger / warning / info)
-├── docker-compose.yml
-├── .env.example
-└── doc/                 ← Session logs, architecture notes, setup guide
+│   ├── app.js           ← Provider switcher, scrape logic, tooltips, copy button
+│   └── style.css        ← Styles, provider cards, popup themes, print
+├── Dockerfile           ← Root-level Dockerfile for Render deployment
+├── docker-compose.yml   ← Local Docker setup
+├── .env.example         ← Template for API keys
+└── doc/
+    ├── project-setup-and-mvp.md      ← Build checklist
+    ├── system-deep-dive.md           ← Features, LLM flow, tech, infrastructure
+    ├── architecture-and-setup.md     ← Architecture diagram + setup steps
+    └── changes-tests-enhancements.md ← Changes made, test coverage, enhancement ideas
 ```
 
 ---
@@ -110,13 +135,12 @@ smart-auth-scraper/
 ```
 
 ### `GET /providers`
-Returns all AI providers with config status, model, and rate limits.
 ```json
 {
   "providers": [
-    { "id": "openai", "name": "OpenAI", "model": "gpt-4o-mini", "rpm": 500, "configured": true, "tier": "paid" },
-    { "id": "anthropic", "name": "Anthropic (Claude)", "model": "claude-haiku-4-5", "rpm": 5, "configured": true, "tier": "free" },
-    { "id": "gemini", "name": "Google Gemini", "model": "gemini-1.5-flash", "rpm": 15, "configured": false, "tier": "free" }
+    { "id": "openai",  "name": "OpenAI",        "model": "gpt-4.1-mini",    "rpm": 500, "configured": true,  "tier": "paid" },
+    { "id": "ollama",  "name": "Ollama Cloud",   "model": "gemma3:4b",       "rpm": 60,  "configured": true,  "tier": "paid" },
+    { "id": "gemini",  "name": "Google Gemini",  "model": "gemini-2.5-flash","rpm": 5,   "configured": false, "tier": "free" }
   ],
   "default": "openai"
 }
@@ -125,30 +149,30 @@ Returns all AI providers with config status, model, and rate limits.
 ### `POST /scrape`
 **Request:**
 ```json
-{ "url": "https://example.com/login", "provider": "openai" }
+{ "url": "https://github.com/login", "provider": "openai" }
 ```
 
-**Success Response:**
+**Success response:**
 ```json
 {
-  "url": "https://example.com/login",
+  "url": "https://github.com/login",
   "auth_found": true,
   "html_snippet": "<form>...</form>",
-  "fields_detected": ["email", "password", "submit"],
-  "llm_analysis": "This is a standard login form with email and password fields and a remember-me checkbox.",
+  "fields_detected": ["username", "password", "submit"],
+  "llm_analysis": "This is a standard login form with username and password fields.",
   "scrape_method": "requests",
   "provider_used": "openai",
-  "tokens_used": { "input": 142, "output": 64, "total": 206 }
+  "tokens_used": { "input": 232, "output": 50, "total": 282 }
 }
 ```
 
-**Error Response (all errors):**
+**Error response:**
 ```json
 {
   "error_type": "SCRAPE_BLOCKED",
   "title": "Access Blocked (403)",
   "message": "The site refused the scraper request.",
-  "suggestion": "Try the direct login URL or switch to Playwright mode."
+  "suggestion": "Try the direct login URL."
 }
 ```
 
@@ -156,15 +180,13 @@ Returns all AI providers with config status, model, and rate limits.
 
 ## Error Handling
 
-Every failure returns a structured error — no vague messages. Errors are shown as a themed popup in the UI.
-
 | Category | Errors Covered |
 |---|---|
-| Scraping | Timeout, 403 blocked, 404 not found, DNS fail, SSL error, redirect loop, rate limited, empty page |
-| OpenAI | Invalid key, rate limit, quota exceeded, network error |
-| Anthropic | Invalid key, rate limit, server overloaded, network error |
-| Gemini | Invalid key, rate/quota limit, network error |
-| Config | Provider not configured, unknown provider, server not running |
+| Scraping | Timeout, blocked (403), not found (404), DNS fail, SSL error, redirect loop, rate limited (429), server error (5xx), empty page |
+| OpenAI | Invalid key, rate limit, quota exceeded, network error, API error |
+| Ollama | Invalid key, rate limit, model not found, network error |
+| Gemini | Invalid key, rate/quota limit, model not found, invalid request, service unavailable |
+| Config | Provider not configured, unknown provider, package not installed |
 
 ---
 
@@ -192,7 +214,7 @@ docker compose up -d
 ```bash
 # 1. Create venv
 python3 -m venv venv
-source venv/bin/activate
+source venv/bin/activate   # Windows: venv\Scripts\activate
 
 # 2. Install
 cd backend
@@ -203,7 +225,7 @@ playwright install chromium
 cp .env.example .env
 
 # 4. Start server
-uvicorn main:app --reload --reload-exclude venv
+uvicorn main:app --reload
 
 # 5. Open frontend/index.html in your browser
 ```
@@ -218,19 +240,37 @@ cd backend
 pytest tests/ -v
 ```
 
-28 tests — all mocked, no real network or API calls needed.
+All tests are mocked — no real network or API calls needed.
+
+---
+
+## Deployment
+
+### Backend → Render
+1. Push repo to GitHub
+2. Render → New Web Service → connect repo
+3. Set **Dockerfile Path** to `./Dockerfile` (repo root)
+4. Add env vars in Render dashboard (OPENAI_API_KEY, OLLAMA_API_KEY, GEMINI_API_KEY)
+5. Deploy → get URL like `https://smart-auth-scraper.onrender.com`
+
+### Frontend → Vercel
+1. Vercel → New Project → connect repo
+2. Set **Root Directory** to `frontend`
+3. Framework Preset: `Other`, leave build/output blank
+4. Update `API_BASE` in `frontend/app.js` with your Render URL
+5. Deploy
 
 ---
 
 ## Environment Variables
 
-| Variable | Provider | Required |
-|---|---|---|
-| `OPENAI_API_KEY` | OpenAI | At least one must be set |
-| `ANTHROPIC_API_KEY` | Anthropic (Claude) | At least one must be set |
-| `GEMINI_API_KEY` | Google Gemini | At least one must be set |
+| Variable | Provider |
+|---|---|
+| `OPENAI_API_KEY` | OpenAI |
+| `OLLAMA_API_KEY` | Ollama Cloud |
+| `GEMINI_API_KEY` | Google Gemini |
 
-Get your keys:
-- OpenAI → [platform.openai.com](https://platform.openai.com)
-- Anthropic → [console.anthropic.com](https://console.anthropic.com)
-- Gemini → [aistudio.google.com](https://aistudio.google.com)
+At least one must be set. Get keys at:
+- OpenAI → platform.openai.com
+- Ollama → ollama.com/settings/keys
+- Gemini → aistudio.google.com

@@ -192,6 +192,58 @@ form.addEventListener("submit", async (e) => {
   }
 });
 
+// ── Field type descriptions (shown as tooltips) ───────────────────────────────
+const FIELD_INFO = {
+  email:    "Email address field — type=email or name/placeholder contains 'email'",
+  password: "Password field — type=password or name/aria-label contains 'password'",
+  username: "Username or login field — matched by name or placeholder",
+  text:     "Generic text input — purpose could not be determined from its attributes",
+  submit:   "Submit button — triggers the form login action",
+  checkbox: "Checkbox — commonly a 'Remember me' option",
+  hidden:   "Hidden field — not visible to user, carries CSRF tokens or session data",
+};
+
+// ── HTML formatter — pretty-prints raw HTML with indentation ──────────────────
+function formatHTML(html) {
+  const SELF_CLOSING = new Set(["input","br","hr","img","meta","link","area","base","col","embed","param","source","track","wbr"]);
+  let out = "";
+  let depth = 0;
+  const pad = () => "  ".repeat(depth);
+
+  // Split into tokens: tags and text nodes
+  const tokens = html.split(/(?=<)|(?<=>)/g);
+  for (let token of tokens) {
+    token = token.trim();
+    if (!token) continue;
+
+    if (token.startsWith("</")) {
+      depth = Math.max(0, depth - 1);
+      out += pad() + token + "\n";
+    } else if (token.startsWith("<")) {
+      out += pad() + token + "\n";
+      const tagName = (token.match(/^<([a-zA-Z][^\s/>]*)/) || [])[1] || "";
+      if (tagName && !SELF_CLOSING.has(tagName.toLowerCase()) && !token.endsWith("/>")) {
+        depth++;
+      }
+    } else {
+      const text = token.trim();
+      if (text) out += pad() + text + "\n";
+    }
+  }
+  return out.trim();
+}
+
+// ── Copy button ───────────────────────────────────────────────────────────────
+document.getElementById("copyBtn").addEventListener("click", () => {
+  const code = document.querySelector("#htmlSnippet code").textContent;
+  navigator.clipboard.writeText(code).then(() => {
+    const btn = document.getElementById("copyBtn");
+    btn.textContent = "Copied!";
+    btn.classList.add("copied");
+    setTimeout(() => { btn.textContent = "Copy"; btn.classList.remove("copied"); }, 2000);
+  });
+});
+
 // ── Render results ────────────────────────────────────────────────────────────
 function renderResults(data) {
   const badge = document.getElementById("statusBadge");
@@ -213,12 +265,15 @@ function renderResults(data) {
 
   const fieldTags = document.getElementById("fieldTags");
   fieldTags.innerHTML = data.fields_detected.length
-    ? data.fields_detected.map((f) => `<span class="tag">${f}</span>`).join("")
+    ? data.fields_detected.map((f) => {
+        const tip = FIELD_INFO[f] || `Input field type: ${f}`;
+        return `<span class="tag field-tag" data-tooltip="${tip}">${f} <span class="field-info-icon">?</span></span>`;
+      }).join("")
     : '<span style="color:#718096">None detected</span>';
 
   document.getElementById("scrapeMethod").textContent = data.scrape_method;
-  document.querySelector("#htmlSnippet code").textContent =
-    data.html_snippet || "No HTML snippet available.";
+  const snippet = data.html_snippet ? formatHTML(data.html_snippet) : "No HTML snippet available.";
+  document.querySelector("#htmlSnippet code").textContent = snippet;
 
   results.classList.remove("hidden");
 }

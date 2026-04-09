@@ -204,6 +204,76 @@ header p { margin-top: 0.4rem; color: #555; }
 .tag-info   { background: #e0f2fe; color: #0369a1; }
 .tag-tokens { background: #f3e8ff; color: #7c3aed; }
 
+/* ── Field tag tooltips ─────────────────────────── */
+.field-tag {
+  position: relative;
+  cursor: help;
+}
+
+.field-info-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: rgba(55, 48, 163, 0.25);
+  font-size: 0.6rem;
+  font-weight: 700;
+  margin-left: 3px;
+  vertical-align: middle;
+}
+
+.field-tag::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1a1a2e;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 400;
+  padding: 0.45rem 0.75rem;
+  border-radius: 7px;
+  width: max-content;
+  max-width: 240px;
+  white-space: normal;
+  text-align: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 200;
+  line-height: 1.4;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+}
+
+.field-tag:hover::after { opacity: 1; }
+
+/* ── Code block header (title + copy btn) ───── */
+.code-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.6rem;
+}
+
+.code-header h2 { margin-bottom: 0; }
+
+.copy-btn {
+  padding: 0.3rem 0.85rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: #fff;
+  border: 1.5px solid #d0d7de;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #1a1a2e;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.copy-btn:hover  { background: #f0f4ff; border-color: #4361ee; color: #4361ee; }
+.copy-btn.copied { background: #d1fae5; border-color: #16a34a; color: #065f46; }
+
 /* ── HTML snippet ───────────────────────────────── */
 pre {
   background: #1e1e2e;

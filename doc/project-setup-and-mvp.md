@@ -38,12 +38,28 @@
 - [x] Dockerized backend — `Dockerfile` + `docker-compose.yml` using official Playwright Python image
 - [x] Backend running in Docker on `http://localhost:8000` — health + all 3 providers confirmed live
 - [x] Updated README — agentic pipeline explanation, full tech stack with why, API reference, error table, Docker + local setup
-- [x] Replaced Anthropic (no credits) with Ollama Cloud — model: gemma4:e4b, uses OLLAMA_API_KEY
-- [x] Updated Ollama model to gemma4:e4b (llama3.1:8b not available on Ollama Cloud)
-- [x] Rebuilt Docker — all 3 providers confirmed live (OpenAI gpt-4o-mini, Ollama gemma4:e4b, Gemini gemini-2.5-flash)
-- [ ] Install dependencies (`pip install -r requirements.txt`)
-- [ ] Install Playwright browser (`playwright install chromium`)
-- [ ] Add `.env` with all 3 API keys (OpenAI, Anthropic, Gemini)
-- [ ] Run tests (`pytest tests/`)
-- [ ] Live end-to-end test via browser
-- [ ] Scrape the 5 required demo sites and document results
+- [x] Replaced Anthropic (no credits) with Ollama Cloud — model: gemma3:4b, uses OLLAMA_API_KEY
+- [x] Updated Ollama model to gemma3:4b (llama3.1:8b, gemma4:e4b not available on Ollama Cloud — confirmed by listing live account models)
+- [x] Updated OpenAI model to gpt-4.1-mini (project doesn't have gpt-4o-mini access — confirmed by listing available models)
+- [x] Rebuilt Docker — all 3 providers confirmed live (OpenAI gpt-4.1-mini, Ollama gemma3:4b, Gemini gemini-2.5-flash)
+- [x] Fixed Playwright trigger — now uses `<form>/<input>` presence check, not just HTML length
+- [x] Fixed Playwright wait — changed `networkidle` to `load` + `wait_for_selector` (SPAs never reach networkidle)
+- [x] Fixed detector — broadened password field matching to name, aria-label, placeholder, id, autocomplete
+- [x] Added field tooltips — hover on field tags to see what each means and how detected
+- [x] Added HTML formatter — pretty-prints snippet with indentation
+- [x] Added copy button — one-click copy of HTML snippet to clipboard
+- [x] Added root-level Dockerfile for Render deployment
+- [x] Updated README — full feature list, tech stack with why, API reference, deployment guide
+- [x] Created doc/system-deep-dive.md — features, LLM flow, tech, infrastructure explained for study
+- [x] Created doc/changes-tests-enhancements.md — all changes, test coverage, gaps, enhancement ideas
+
+---
+
+## To Do Next
+
+- [ ] Run tests (`pytest tests/`) — verify nothing broke after detector + scraper changes
+- [ ] Scrape 5 demo sites and document results (required by PDF)
+- [ ] Deploy backend to Render
+- [ ] Deploy frontend to Vercel
+- [ ] Update API_BASE in app.js with Render URL
+- [ ] Update README with live deployed URLs
