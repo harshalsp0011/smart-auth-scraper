@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smart Auth Scraper</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Smart Auth Scraper</h1>
+      <p>Detects login/authentication forms on any website using AI.</p>
+    </header>
+
+    <!-- Provider Switcher -->
+    <section class="provider-section">
+      <h2 class="section-label">AI Provider</h2>
+      <div id="providerCards" class="provider-grid">
+        <div class="provider-card skeleton"></div>
+        <div class="provider-card skeleton"></div>
+        <div class="provider-card skeleton"></div>
+      </div>
+    </section>
+
+    <!-- URL Input -->
+    <form id="scrapeForm">
+      <div class="input-row">
+        <input
+          type="url"
+          id="urlInput"
+          placeholder="https://example.com/login"
+          required
+        />
+        <button type="submit" id="submitBtn">Scrape</button>
+      </div>
+    </form>
+
+    <div id="loader" class="hidden">Scraping&hellip;</div>
+
+    <!-- Results -->
+    <section id="results" class="hidden">
+      <div class="results-toolbar">
+        <div id="statusBadge" class="badge"></div>
+        <button id="printBtn" class="print-btn" onclick="window.print()">&#128438; Print</button>
+      </div>
+
+      <div class="result-block">
+        <h2>AI Analysis</h2>
+        <div class="analysis-meta">
+          <span id="providerUsed" class="tag tag-info"></span>
+          <span id="tokenUsage" class="tag tag-tokens"></span>
+        </div>
+        <p id="llmAnalysis"></p>
+      </div>
+
+      <div class="result-block">
+        <h2>Fields Detected</h2>
+        <div id="fieldTags" class="tags"></div>
+      </div>
+
+      <div class="result-block">
+        <h2>Scrape Method</h2>
+        <span id="scrapeMethod" class="tag tag-info"></span>
+      </div>
+
+      <div class="result-block">
+        <h2>HTML Snippet</h2>
+        <pre id="htmlSnippet"><code></code></pre>
+      </div>
+    </section>
+  </div>
+
+  <!-- Error Popup Modal -->
+  <div id="errorOverlay" class="error-overlay hidden" role="dialog" aria-modal="true">
+    <div class="error-modal">
+      <div class="error-modal-icon" id="errorIcon">&#9888;</div>
+      <h2 id="errorTitle"></h2>
+      <p id="errorMessage"></p>
+      <div id="errorSuggestion" class="error-suggestion hidden">
+        <span class="suggestion-label">What to do</span>
+        <p id="errorSuggestionText"></p>
+      </div>
+      <div class="error-type-badge" id="errorTypeBadge"></div>
+      <button id="errorCloseBtn" class="error-close-btn">Got it</button>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
