@@ -7,6 +7,7 @@ Returns (html, method, screenshot_base64) on success, raises ScraperError on fai
 
 import requests
 from bs4 import BeautifulSoup
+from urllib.parse import urlparse
 from requests.exceptions import (
     ConnectionError, Timeout, TooManyRedirects, SSLError, HTTPError, RequestException
 )
@@ -169,6 +170,40 @@ def _has_real_form_or_input(html: str) -> bool:
     return bool(soup.find("form") or soup.find("input"))
 
 
+def _has_password_like_signal(html: str) -> bool:
+    """Detect password/auth hints in real input elements (not script text)."""
+    if not html:
+        return False
+
+    soup = BeautifulSoup(html, "html.parser")
+    for inp in soup.find_all("input"):
+        input_type = (inp.get("type") or "").lower()
+        if input_type == "password":
+            return True
+
+        for attr in ("name", "aria-label", "placeholder", "id", "autocomplete"):
+            value = (inp.get(attr) or "").lower()
+            if any(keyword in value for keyword in ("password", "passcode", "otp", "mfa", "2fa")):
+                return True
+    return False
+
+
+def _is_auth_intent_url(url: str) -> bool:
+    """Detect URL patterns likely intended for authentication routes."""
+    parsed = urlparse(url)
+    host = (parsed.hostname or "").lower()
+    path = (parsed.path or "").lower()
+
+    if any(segment in path for segment in ("/login", "/signin", "/sign-in", "/auth", "/session", "/account")):
+        return True
+
+    # Known JS-heavy auth routes that often render forms after runtime initialization.
+    if host in {"discord.com", "www.discord.com"} and "/login" in path:
+        return True
+
+    return False
+
+
 def fetch_html(url: str) -> tuple[str, str, str | None]:
     """
     Fetch HTML from a URL. Returns (html, method_used, screenshot_base64).
@@ -186,7 +221,8 @@ def fetch_html(url: str) -> tuple[str, str, str | None]:
     # If HTML looks empty/minimal OR has no actual DOM form/input elements, try Playwright
     is_minimal = len(html) < 500 or "<body" not in html.lower()
     is_js_rendered = not _has_real_form_or_input(html)
-    if is_minimal or is_js_rendered:
+    auth_intent_without_password = _is_auth_intent_url(url) and not _has_password_like_signal(html)
+    if is_minimal or is_js_rendered or auth_intent_without_password:
         playwright_html, screenshot = fetch_with_playwright(url)
         if playwright_html:
             return playwright_html, "playwright", screenshot
