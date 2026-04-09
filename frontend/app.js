@@ -1,5 +1,5 @@
-const API_BASE = "http://localhost:8000";
-//const API_BASE = "https://smart-auth-scraper.onrender.com";
+//const API_BASE = "http://localhost:8000";
+const API_BASE = "https://smart-auth-scraper.onrender.com";
 const AUTH_TOKEN_STORAGE_KEY = "smart-auth-scraper-auth-token";
 
 let selectedProvider = null;
